@@ -22,6 +22,15 @@ byte packetLength = 0;
 byte bufferIndex = 0;
 bool receivingPacket = false;
 
+const int PULSES_PER_REVOLUTION = 12;
+const int GEAR_RATIO_MULTIPLIER = 27;
+
+unsigned long lastEncoderSampleTime = 0;
+long lastFrontLeftTicks = 0;
+long lastFrontRightTicks = 0;
+float frontLeftRadSec = 0;
+float frontRightRadSec = 0;
+
 void setup() {
 
   // Serial comms to raspberry pi  
@@ -43,6 +52,7 @@ void setup() {
 
 void loop() {
   readSerial();
+  sampleEncoders();
   updateMotors();
 }
 
@@ -146,7 +156,48 @@ void sendMotorCommand(HardwareSerial &port, byte address, byte motor, int speed)
 }
 
 void onFrontLeftEncoder() {
-
+  if( digitalRead( ENCODER_FRONT_LEFT_B ) ) {
+    encoderFrontLeft++;
+  } else {
+    encoderFrontLeft--;
+  }
 }
 void onFrontRightEncoder() {
+  if( digitalRead( ENCODER_FRONT_RIGHT_B ) ) {
+    encoderFrontRight++;
+  } else {
+    encoderFrontRight--;
+  }
+}
+
+void sampleEncoders() {
+  unsigned long now = millis();
+
+  // Sample encoders every 100ms
+  if(now - lastEncoderSampleTime >= 100) {
+
+    // Disable interrupts to safely read encoder values
+    noInterrupts();
+    long leftEncoderNow = encoderFrontLeft;
+    long rightEncoderNow = encoderFrontRight;
+    interrupts();
+
+    // Calculate the time since the last sample
+    float intervalSec = (now -lastEncoderSampleTime) / 1000.0;
+    long deltaFrontLeft  = leftEncoderNow - lastFrontLeftTicks;
+    long deltaFrontRight = rightEncoderNow - lastFrontRightTicks;
+
+    // Avoid division by zero
+    if (intervalSec <= 0.0) {
+      return;
+    }
+    // Calculate angular velocity in radians per second
+    frontLeftRadSec = ((deltaFrontLeft / intervalSec) / (PULSES_PER_REVOLUTION * GEAR_RATIO_MULTIPLIER)) * TWO_PI;
+    frontRightRadSec = ((deltaFrontRight / intervalSec) / (PULSES_PER_REVOLUTION * GEAR_RATIO_MULTIPLIER)) * TWO_PI;
+
+    lastFrontLeftTicks = leftEncoderNow;
+    lastFrontRightTicks = rightEncoderNow;
+    lastEncoderSampleTime = now;
+
+  }
 }
