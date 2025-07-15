@@ -1,0 +1,25 @@
+Checks: >
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  readability-*,
+  modernize-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '.*'
+AnalyzeTemporaryDtors: false
+FormatStyle: file
+CheckOptions:
+  - { key: modernize-use-nullptr.NullMacros, value: 'NULL' }
+  - { key: modernize-use-nullptr.UseNullptr, value: true }
+  - { key: readability-identifier-naming.VariableCase, value: lower_case }
+  - { key: readability-identifier-naming.MemberVariableCase, value: camelBack }
+  - { key: cppcoreguidelines-non-private-member-variables-in-classes.IgnorePublicMemberVariables, value: 1 }
