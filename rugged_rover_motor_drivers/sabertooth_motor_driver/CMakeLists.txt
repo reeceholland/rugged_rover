@@ -11,71 +11,74 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-################################################################################
-# Find ament packages and libraries for ament and system dependencies
-################################################################################
+# Required dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
 
-################################################################################
-# Build
-################################################################################
-include_directories(
-  include
+# === Driver Library ===
+add_library(sabertooth_driver_lib
+  src/driver.cpp
 )
 
+target_include_directories(sabertooth_driver_lib
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
 
-# Source files
-set(SOURCES
+ament_target_dependencies(sabertooth_driver_lib
+  rclcpp
+)
+
+# === Node Executable ===
+add_executable(sabertooth_driver_node
   src/sabertooth_driver_node.cpp
-  src/driver.cpp
   src/main.cpp
 )
 
-# Declare executable
-add_executable(sabertooth_driver_node ${SOURCES})
+target_link_libraries(sabertooth_driver_node
+  sabertooth_driver_lib
+)
 
-# Link against dependencies
 ament_target_dependencies(sabertooth_driver_node
   rclcpp
   sensor_msgs
+  std_msgs
 )
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+# === Unit Tests ===
+ament_add_gtest(test_driver
+  test/test_driver.cpp
+)
 
-################################################################################
-# Install
-################################################################################
+target_link_libraries(test_driver
+  sabertooth_driver_lib
+  pthread
+)
 
-# Install target
+ament_target_dependencies(test_driver
+  rclcpp
+)
+
+# === Install ===
 install(TARGETS
   sabertooth_driver_node
+  sabertooth_driver_lib
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install launch files
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-# Install headers
 install(DIRECTORY include/
   DESTINATION include/
 )
 
-install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}/
+install(DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
 )
+
+# === Export ===
+ament_export_include_directories(include)
+ament_export_dependencies(rclcpp)
 
 ament_package()
