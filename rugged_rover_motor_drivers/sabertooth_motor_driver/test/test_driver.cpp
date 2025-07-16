@@ -1,8 +1,7 @@
-#include <gtest/gtest.h>
 #include "sabertooth_motor_driver/driver.hpp"
+#include <gtest/gtest.h>
 
 using sabertooth_motor_driver::Driver;
-
 
 TEST(DriverTests, ComputeChecksumWorks)
 {
