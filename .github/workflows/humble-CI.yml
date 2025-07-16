@@ -1,0 +1,52 @@
+name: Humble CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+
+    env:
+      ROS_DISTRO: humble
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up ROS 2 apt sources
+        run: |
+          sudo apt update
+          sudo apt install -y curl gnupg2 lsb-release
+          sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | \
+            sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+          sudo apt update
+
+      - name: Install ROS 2 Humble Desktop
+        run: |
+          sudo apt install -y ros-humble-desktop python3-colcon-common-extensions python3-rosdep
+          sudo rosdep init
+          rosdep update
+
+      - name: Install dependencies
+        run: |
+          sudo apt install -y build-essential
+          rosdep install --from-paths rugged_rover_motor_drivers/sabertooth_motor_driver/src --ignore-src -r -y
+
+      - name: Source ROS 2 and build with colcon
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --event-handlers console_direct+
+
+      - name: Run tests
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test --event-handlers console_direct+
+          colcon test-result --verbose
