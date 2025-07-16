@@ -38,12 +38,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt install -y build-essential
-          rosdep install --from-paths src --ignore-src -r -y
+          rosdep install --from-paths sabertooth_motor_driver --ignore-src -r -y
 
       - name: Source ROS 2 and build with colcon
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build --event-handlers console_direct+
+          colcon build --from-paths sabertooth_motor_driver --event-handlers console_direct+
 
       - name: Run tests
         run: |
