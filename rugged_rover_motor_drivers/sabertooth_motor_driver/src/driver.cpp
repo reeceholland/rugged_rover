@@ -12,7 +12,7 @@ namespace sabertooth_motor_driver
 {
 
   Driver::Driver(const std::string& port, const rclcpp::Logger& logger, int baudrate)
-      : fd_(-1), port_(port), baudrate_(baudrate), logger_(logger)
+      : fd_(-1), port_(port), logger_(logger), baudrate_(baudrate)
   {
     openPort();
   }
