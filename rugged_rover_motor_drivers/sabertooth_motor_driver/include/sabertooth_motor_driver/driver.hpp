@@ -24,7 +24,8 @@ namespace sabertooth_motor_driver
   class Driver
   {
   public:
-    explicit Driver(const std::string& serial_port, const rclcpp::Logger& logger, int baudrate = 115200);
+    explicit Driver(const std::string& serial_port, const rclcpp::Logger& logger,
+                    int baudrate = 115200);
     ~Driver();
 
     bool sendVelocityCommand(double left_rad_s, double right_rad_s);
@@ -48,7 +49,6 @@ namespace sabertooth_motor_driver
 
     bool openPort();
     void closePort();
-
   };
 
 } // namespace sabertooth_motor_driver
