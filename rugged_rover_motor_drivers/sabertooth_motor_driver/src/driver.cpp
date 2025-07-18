@@ -166,7 +166,7 @@ namespace sabertooth_motor_driver
    * @return An optional JointFeedback structure containing the feedback data, or std::nullopt on
    * failure.
    */
-  std::optional<JointFeedback> Driver::requestFeedback()
+  std::optional<Feedback> Driver::requestFeedback()
   {
     if (fd_ < 0)
     {
@@ -219,7 +219,7 @@ namespace sabertooth_motor_driver
     auto parseInt16LE = [](uint8_t lo, uint8_t hi) -> int16_t
     { return static_cast<int16_t>((hi << 8) | lo); };
 
-    JointFeedback feedback;
+    Feedback feedback;
     feedback.front_left_velocity_rad_s =
         parseInt16LE(response[3], response[4]) / static_cast<double>(SCALE);
     feedback.front_left_position_rad =
@@ -228,6 +228,7 @@ namespace sabertooth_motor_driver
         parseInt16LE(response[7], response[8]) / static_cast<double>(SCALE);
     feedback.front_right_position_rad =
         parseInt16LE(response[9], response[10]) / static_cast<double>(SCALE);
+    feedback.battery_voltage_mv = (response[11] | (response[12] << 8));
 
     return feedback;
   }

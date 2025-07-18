@@ -7,64 +7,76 @@
 #define ENCODER_FRONT_RIGHT_A 20
 #define ENCODER_FRONT_RIGHT_B 21
 
+#define BATTERY_VOLTAGE_PIN A0
+
 #define SCALE 1000.0
 #define START_BYTE 0xFF
+
+bool debugging = true;
 
 // Packet types
 const byte PACKET_TYPE_VELOCITY = 0x02;
 const byte VELOCITY_PACKET_LENGTH = 0x08;
+
 const byte PACKET_TYPE_FEEDBACK_REQUEST = 0x03;
 const byte FEEDBACK_REQUEST_LENGTH = 0x04;
 const byte PACKET_TYPE_FEEDBACK_RESPONSE = 0x04;
-const byte FEEDBACK_RESPONSE_LENGTH = 0x0C;
+const byte FEEDBACK_RESPONSE_LENGTH = 0x0E;
+
+const byte PACKET_TYPE_VOLTAGE_FEEDBACK_REQUEST = 0x05;
+const byte VOLTAGE_FEEDBACK_LENGTH = 0x04;
+const byte PACKET_TYPE_VOLTAGE_FEEDBACK_RESPONSE = 0x06;
+const byte VOLTAGE_FEEDBACK_RESPONSE_LENGTH = 0x06;
+
 const byte MAX_PACKET_SIZE = 16;
 
-// Encoder constants
 const float PULSES_PER_REVOLUTION = 12.0;
 const float GEAR_RATIO_MULTIPLIER = 27.0;
 
-// State
+// Encoder state
 volatile long encoderFrontLeft = 0;
 volatile long encoderFrontRight = 0;
 
+// Serial packet buffer
 byte packetBuffer[MAX_PACKET_SIZE];
 byte packetLength = 0;
 byte bufferIndex = 0;
 bool receivingPacket = false;
 
+// Timing
 unsigned long lastEncoderSampleTime = 0;
 long lastFrontLeftTicks = 0;
 long lastFrontRightTicks = 0;
 
-// Control variables (doubles for QuickPID)
+// Control variables
 float frontLeftRadSec = 0;
-double frontRightRadSec = 0;
+float frontRightRadSec = 0;
 float setpointVelocityFrontLeft = 0;
-double setpointVelocityFrontRight = 0;
+float setpointVelocityFrontRight = 0;
 float outputFrontLeft = 0;
 
-// PID controller
+
+
 QuickPID frontLeftPID(&frontLeftRadSec, &outputFrontLeft, &setpointVelocityFrontLeft);
 
 void setup() {
-  Serial.begin(115200);     // ROS2 serial
+  Serial.begin(115200);     // Host communication
   Serial1.begin(9600);      // Sabertooth serial
 
   pinMode(ENCODER_FRONT_LEFT_A, INPUT);
   pinMode(ENCODER_FRONT_LEFT_B, INPUT);
   pinMode(ENCODER_FRONT_RIGHT_A, INPUT);
   pinMode(ENCODER_FRONT_RIGHT_B, INPUT);
+  pinMode(BATTERY_VOLTAGE_PIN, INPUT);
 
   attachInterrupt(digitalPinToInterrupt(ENCODER_FRONT_LEFT_A), onFrontLeftEncoder, RISING);
   attachInterrupt(digitalPinToInterrupt(ENCODER_FRONT_RIGHT_A), onFrontRightEncoder, RISING);
 
   frontLeftPID.SetTunings(3.0, 0.7, 0.1);
   frontLeftPID.SetOutputLimits(-127, 127);
-  frontLeftPID.SetMode(frontLeftPID.Control::automatic);
+  frontLeftPID.SetMode(QuickPID::Control::automatic);
   frontLeftPID.SetSampleTimeUs(50000);
   frontLeftPID.SetDerivativeMode(QuickPID::dMode::dOnMeas);
-
-  //frontLeftPID.SetAntiWindupMode(QuickPID::iAwMode::iAwOff);
 }
 
 void loop() {
@@ -95,19 +107,24 @@ void readSerial() {
       if (bufferIndex == 2) {
         packetLength = packetBuffer[1];
         if (packetLength > MAX_PACKET_SIZE || packetLength < 4) {
-          receivingPacket = false;
-          bufferIndex = 0;
-          packetLength = 0;
-          memset(packetBuffer, 0, MAX_PACKET_SIZE);
+          resetPacket();
+          return;
         }
       }
 
       if (bufferIndex == packetLength && receivingPacket) {
         receivingPacket = false;
         parsePacket(packetBuffer, packetLength);
+        resetPacket();
       }
     }
   }
+}
+
+void resetPacket() {
+  receivingPacket = false;
+  bufferIndex = 0;
+  packetLength = 0;
 }
 
 void parsePacket(byte* packet, byte length) {
@@ -118,32 +135,29 @@ void parsePacket(byte* packet, byte length) {
   if (checksum != packet[length - 1]) return;
 
   byte type = packet[2];
-
   switch (type) {
     case PACKET_TYPE_FEEDBACK_REQUEST:
       if (length == FEEDBACK_REQUEST_LENGTH) sendFeedbackResponse();
       break;
-
     case PACKET_TYPE_VELOCITY:
       if (length != VELOCITY_PACKET_LENGTH) return;
 
       int16_t velocityFrontLeftRaw = packet[3] | (packet[4] << 8);
       int16_t velocityFrontRightRaw = packet[5] | (packet[6] << 8);
 
-      setpointVelocityFrontLeft = (velocityFrontLeftRaw / SCALE);
-      setpointVelocityFrontRight = (velocityFrontRightRaw / SCALE);
+      setpointVelocityFrontLeft = velocityFrontLeftRaw / SCALE;
+      setpointVelocityFrontRight = velocityFrontRightRaw / SCALE;
       break;
   }
 }
 
 void updateMotors() {
-  // Apply deadband
   if (abs(outputFrontLeft) < 20 && abs(setpointVelocityFrontLeft) > 0.5) {
     outputFrontLeft = (outputFrontLeft > 0) ? 20 : -20;
   }
 
-  sendMotorCommand(Serial1, SABERTOOTH_ADDR, 1, (int)0);
-  sendMotorCommand(Serial1, SABERTOOTH_ADDR, 2, (int)outputFrontLeft); // crude scale for test
+  sendMotorCommand(Serial1, SABERTOOTH_ADDR, 1, 0); // motor 1 disabled
+  sendMotorCommand(Serial1, SABERTOOTH_ADDR, 2, (int)outputFrontLeft);
 }
 
 void sendMotorCommand(HardwareSerial& port, byte address, byte motor, int speed) {
@@ -163,13 +177,11 @@ void sendMotorCommand(HardwareSerial& port, byte address, byte motor, int speed)
 }
 
 void onFrontLeftEncoder() {
-  if (digitalRead(ENCODER_FRONT_LEFT_B)) encoderFrontLeft++;
-  else encoderFrontLeft--;
+  encoderFrontLeft += (digitalRead(ENCODER_FRONT_LEFT_B) ? 1 : -1);
 }
 
 void onFrontRightEncoder() {
-  if (digitalRead(ENCODER_FRONT_RIGHT_B)) encoderFrontRight++;
-  else encoderFrontRight--;
+  encoderFrontRight += (digitalRead(ENCODER_FRONT_RIGHT_B) ? 1 : -1);
 }
 
 void sampleEncoders() {
@@ -178,7 +190,7 @@ void sampleEncoders() {
   long rightEncoderNow = encoderFrontRight;
   interrupts();
 
-  float intervalSec = 0.05;  // fixed 50 ms interval
+  float intervalSec = 0.05;
   long deltaLeft = leftEncoderNow - lastFrontLeftTicks;
   long deltaRight = rightEncoderNow - lastFrontRightTicks;
 
@@ -188,27 +200,47 @@ void sampleEncoders() {
   lastFrontLeftTicks = leftEncoderNow;
   lastFrontRightTicks = rightEncoderNow;
 
+
 }
 
 void sendFeedbackResponse() {
-  byte response[FEEDBACK_RESPONSE_LENGTH];
-  response[0] = START_BYTE;
-  response[1] = FEEDBACK_RESPONSE_LENGTH;
-  response[2] = PACKET_TYPE_FEEDBACK_RESPONSE;
+  byte response[FEEDBACK_RESPONSE_LENGTH] = {
+    START_BYTE,
+    FEEDBACK_RESPONSE_LENGTH,
+    PACKET_TYPE_FEEDBACK_RESPONSE
+  };
 
   int16_t leftVelRaw = static_cast<int16_t>(frontLeftRadSec * SCALE);
   int16_t rightVelRaw = static_cast<int16_t>(frontRightRadSec * SCALE);
+
+  int16_t leftPosRaw = 0;   // Placeholder for position
+  int16_t rightPosRaw = 0;
+
+  int16_t voltageRaw = analogRead(BATTERY_VOLTAGE_PIN);
+  int16_t voltageMv = map(voltageRaw, 0, 1023, 0, 5000);
 
   response[3] = leftVelRaw & 0xFF;
   response[4] = (leftVelRaw >> 8) & 0xFF;
   response[5] = rightVelRaw & 0xFF;
   response[6] = (rightVelRaw >> 8) & 0xFF;
 
-  response[7] = response[8] = response[9] = response[10] = 0;
+    // Pack positions
+  response[7]  = leftPosRaw & 0xFF;
+  response[8]  = (leftPosRaw >> 8) & 0xFF;
+  response[9]  = rightPosRaw & 0xFF;
+  response[10] = (rightPosRaw >> 8) & 0xFF;
+
+  // Pack battery voltage
+  response[11] = voltageMv & 0xFF;
+  response[12] = (voltageMv >> 8) & 0xFF;
+
 
   byte checksum = 0;
-  for (int i = 0; i < FEEDBACK_RESPONSE_LENGTH - 1; ++i) checksum ^= response[i];
-  response[11] = checksum;
+  for (int i = 0; i < FEEDBACK_RESPONSE_LENGTH - 1; ++i)
+    checksum ^= response[i];
 
+  response[13] = checksum;
   Serial.write(response, FEEDBACK_RESPONSE_LENGTH);
+  Serial.flush();
 }
+
