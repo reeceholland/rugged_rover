@@ -26,8 +26,8 @@ namespace sabertooth_motor_driver
 
     // Create the publisher for the feedback topic
     // Using SensorDataQoS for better performance with sensor data
-    feedback_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("platform/motors/feedback",
-                                                                         rclcpp::SensorDataQoS());
+    feedback_pub_ = this->create_publisher<rugged_rover_interfaces::msg::RoverFeedback>(
+        "platform/motors/feedback", rclcpp::SensorDataQoS());
 
     // set the interval for the feedback timer
     // Convert feedback_rate_hz to a duration for the timer
@@ -103,21 +103,25 @@ namespace sabertooth_motor_driver
     // Otherwise, log an error message
     if (feedback.has_value())
     {
-      sensor_msgs::msg::JointState feedback_msg;
-      feedback_msg.header.stamp = this->now();
-      feedback_msg.name = {"front_left_joint", "front_right_joint"};
-      feedback_msg.velocity = {feedback->front_left_velocity_rad_s,
-                               feedback->front_right_velocity_rad_s};
-      feedback_msg.position = {feedback->front_left_position_rad,
-                               feedback->front_right_position_rad};
+      rugged_rover_interfaces::msg::RoverFeedback feedback_msg;
+      feedback_msg.battery_voltage_mv = feedback->battery_voltage_mv;
+      feedback_msg.joint_state.header.frame_id = "base_link"; // Set the frame_id for the JointState
+      feedback_msg.joint_state.header.stamp = this->now(); // Set the timestamp for the JointState
+      feedback_msg.joint_state.name = {"front_left_joint", "front_right_joint"};
+      feedback_msg.joint_state.velocity = {feedback->front_left_velocity_rad_s,
+                                           feedback->front_right_velocity_rad_s};
+      feedback_msg.joint_state.position = {feedback->front_left_position_rad,
+                                           feedback->front_right_position_rad};
 
       // Publish the feedback message
       feedback_pub_->publish(feedback_msg);
 
-      RCLCPP_DEBUG(this->get_logger(),
-                   "Feedback - FL Vel: %.2f, FL Pos: %.2f, FR Vel: %.2f, FR Pos: %.2f",
-                   feedback->front_left_velocity_rad_s, feedback->front_left_position_rad,
-                   feedback->front_right_velocity_rad_s, feedback->front_right_position_rad);
+      RCLCPP_DEBUG(
+          this->get_logger(),
+          "Feedback - FL Vel: %.2f, FL Pos: %.2f, FR Vel: %.2f, FR Pos: %.2f Battery: %d mV",
+          feedback->front_left_velocity_rad_s, feedback->front_left_position_rad,
+          feedback->front_right_velocity_rad_s, feedback->front_right_position_rad,
+          feedback->battery_voltage_mv);
     }
     else
     {

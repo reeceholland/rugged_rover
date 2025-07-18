@@ -13,8 +13,9 @@
 namespace sabertooth_motor_driver
 {
 
-  struct JointFeedback
+  struct Feedback
   {
+    uint16_t battery_voltage_mv; // Battery voltage in millivolts
     double front_left_velocity_rad_s;
     double front_left_position_rad;
     double front_right_velocity_rad_s;
@@ -29,7 +30,7 @@ namespace sabertooth_motor_driver
     ~Driver();
 
     bool sendVelocityCommand(double left_rad_s, double right_rad_s);
-    std::optional<JointFeedback> requestFeedback();
+    std::optional<Feedback> requestFeedback();
     static uint8_t computeChecksum(const std::vector<uint8_t>& data);
     static void packInt16LE(std::vector<uint8_t>& buf, int16_t val);
 
@@ -44,7 +45,7 @@ namespace sabertooth_motor_driver
     static constexpr uint8_t CMD_VELOCITY_RAD = 0x02;
     static constexpr uint8_t CMD_FEEDBACK_REQUEST = 0x03;
     static constexpr uint8_t CMD_FEEDBACK_RESPONSE = 0x04;
-    static constexpr uint8_t CMD_FEEDBACK_RESPONSE_SIZE = 12;
+    static constexpr uint8_t CMD_FEEDBACK_RESPONSE_SIZE = 0x0E;
     static constexpr int SCALE = 1000; // rad/s scaled to int16_t
 
     bool openPort();

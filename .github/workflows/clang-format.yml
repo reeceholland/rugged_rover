@@ -2,9 +2,11 @@ name: Clang Format Check
 
 on:
   push:
-    branches: [ motor-drivers ]
+    branches:
+      - '**'
   pull_request:
-    branches: [ motor-drivers ]
+    branches:
+      - '**'
 
 jobs:
   clang-format:
