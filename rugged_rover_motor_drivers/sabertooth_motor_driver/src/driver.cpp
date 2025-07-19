@@ -168,35 +168,47 @@ namespace sabertooth_motor_driver
    */
   std::optional<Feedback> Driver::requestFeedback()
   {
+
+    // Check if the port is open
     if (fd_ < 0)
     {
       RCLCPP_ERROR(logger_, "Port not open for feedback request");
       return std::nullopt;
     }
 
+    // Prepare the feedback request packet
+    // The packet format is: [START_BYTE, LENGTH, CMD_FEEDBACK_REQUEST, CHECKSUM]
     std::vector<uint8_t> packet = {START_BYTE,
                                    0x04, // length
                                    CMD_FEEDBACK_REQUEST};
     packet.push_back(computeChecksum(packet));
 
     RCLCPP_DEBUG(logger_, "Sending feedback request...");
+
+    // Send the feedback request packet
     ssize_t written = write(fd_, packet.data(), packet.size());
+
+    // Check if the write was successful
     if (written != static_cast<ssize_t>(packet.size()))
     {
       RCLCPP_ERROR(logger_, "Failed to send feedback request");
       return std::nullopt;
     }
 
+    // Read the feedback response
     uint8_t response[CMD_FEEDBACK_RESPONSE_SIZE];
     ssize_t bytes_read = read(fd_, response, CMD_FEEDBACK_RESPONSE_SIZE);
     RCLCPP_DEBUG(logger_, "Read %zd bytes from feedback response", bytes_read);
 
+    // Check if the read was successful and the response is complete
     if (bytes_read != CMD_FEEDBACK_RESPONSE_SIZE)
     {
       RCLCPP_ERROR(logger_, "Incomplete feedback response received");
       return std::nullopt;
     }
 
+    // Validate the response
+    // The response should start with START_BYTE and have the correct command type
     if (response[0] != START_BYTE || response[2] != CMD_FEEDBACK_RESPONSE)
     {
       std::ostringstream oss;
@@ -207,18 +219,23 @@ namespace sabertooth_motor_driver
       return std::nullopt;
     }
 
+    // Check the checksum
     uint8_t received_checksum = response[CMD_FEEDBACK_RESPONSE_SIZE - 1];
     uint8_t computed_checksum =
         computeChecksum(std::vector<uint8_t>(response, response + CMD_FEEDBACK_RESPONSE_SIZE - 1));
+
+    // If the checksums do not match, log an error and return std::nullopt
     if (received_checksum != computed_checksum)
     {
       RCLCPP_ERROR(logger_, "Checksum mismatch in feedback response");
       return std::nullopt;
     }
 
+    // Parse the feedback data from the response
     auto parseInt16LE = [](uint8_t lo, uint8_t hi) -> int16_t
     { return static_cast<int16_t>((hi << 8) | lo); };
 
+    // Create a Feedback structure and populate it with the parsed data
     Feedback feedback;
     feedback.front_left_velocity_rad_s =
         parseInt16LE(response[3], response[4]) / static_cast<double>(SCALE);
@@ -230,6 +247,7 @@ namespace sabertooth_motor_driver
         parseInt16LE(response[9], response[10]) / static_cast<double>(SCALE);
     feedback.battery_voltage_mv = (response[11] | (response[12] << 8));
 
+    // Return the populated Feedback structure
     return feedback;
   }
 

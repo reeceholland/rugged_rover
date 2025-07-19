@@ -64,14 +64,6 @@ ament_target_dependencies(test_driver
   rclcpp
 )
 
-add_executable(test_joint_state_publisher src/test_joint_state_publisher.cpp)
-ament_target_dependencies(test_joint_state_publisher rclcpp sensor_msgs)
-
-install(TARGETS
-  test_joint_state_publisher
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 # === Install ===
 install(TARGETS
   sabertooth_driver_node
