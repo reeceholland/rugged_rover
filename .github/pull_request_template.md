@@ -1,6 +1,6 @@
-# 🚀 Pull Request: [Short Description of Your Change]
+# Pull Request: [Short Description of Your Change]
 
-## 📋 Summary
+## Summary
 
 <!-- Provide a concise summary of what this PR does. -->
 This pull request introduces the following changes:
@@ -10,14 +10,14 @@ This pull request introduces the following changes:
 
 ---
 
-## 🧠 Motivation
+## Motivation
 
 <!-- Explain why this change is needed. Reference issues or feature requests if applicable. -->
 Resolves: #<issue_number>
 
 ---
 
-## 🧪 Testing Strategy
+## Testing Strategy
 
 - [x] Built and tested with `colcon build` on ROS 2 Humble
 - [x] Ran `ros2 run` or launch files to verify functionality
@@ -31,7 +31,7 @@ Resolves: #<issue_number>
 
 ---
 
-## 🧰 Implementation Notes
+## Implementation Notes
 
 <!-- Detail any design decisions, protocol changes, or assumptions. -->
 - Introduced new serial protocol format with checksum
@@ -40,7 +40,7 @@ Resolves: #<issue_number>
 
 ---
 
-## 📁 Affected Packages
+## Affected Packages
 
 - `sabertooth_motor_driver`
 - `driver`
@@ -48,7 +48,7 @@ Resolves: #<issue_number>
 
 ---
 
-## 🧪 How to Test
+## How to Test
 
 ```bash
 # Build
