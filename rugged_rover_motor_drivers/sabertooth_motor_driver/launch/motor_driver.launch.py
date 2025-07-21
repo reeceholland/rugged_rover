@@ -17,7 +17,7 @@ def generate_launch_description():
             executable='sabertooth_driver_node',
             name='sabertooth_driver_node',
             parameters=[config_path],
-            arguments=["--ros-args", "--log-level", "DEBUG"],
+            arguments=["--ros-args", "--log-level", "INFO"],
             output='screen'
         )
     ])

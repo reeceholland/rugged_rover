@@ -17,6 +17,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ament_cmake_gtest REQUIRED)
+find_package(rugged_rover_interfaces REQUIRED)
 
 # === Driver Library ===
 add_library(sabertooth_driver_lib
@@ -46,6 +47,7 @@ ament_target_dependencies(sabertooth_driver_node
   rclcpp
   sensor_msgs
   std_msgs
+  rugged_rover_interfaces
 )
 
 # === Unit Tests ===

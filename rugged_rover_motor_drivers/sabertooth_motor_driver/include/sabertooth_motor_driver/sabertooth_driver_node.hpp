@@ -2,6 +2,7 @@
 #ifndef SABERTOOTH_MOTOR_DRIVER__SABERTOOTH_DRIVER_NODE_H
 #define SABERTOOTH_MOTOR_DRIVER__SABERTOOTH_DRIVER_NODE_H
 
+#include "rugged_rover_interfaces/msg/rover_feedback.hpp"
 #include "sabertooth_motor_driver/driver.hpp"
 
 #include <string>
@@ -28,7 +29,7 @@ namespace sabertooth_motor_driver
     std::shared_ptr<Driver> driver_;
     std::string serial_port_;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr cmd_sub_;
-    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr feedback_pub_;
+    rclcpp::Publisher<rugged_rover_interfaces::msg::RoverFeedback>::SharedPtr feedback_pub_;
   };
 
 } // namespace sabertooth_motor_driver
