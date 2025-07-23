@@ -174,7 +174,7 @@ namespace rugged_rover_hardware_interfaces::sabertooth
       auto it = std::find(last_feedback_.joint_state.name.begin(),
                           last_feedback_.joint_state.name.end(), joint_names_[i]);
 
-      // If the joint is found.                     
+      // If the joint is found.
       if (it != last_feedback_.joint_state.name.end())
       {
         // Get the index of the joint in the feedback message
@@ -192,7 +192,7 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     auto bat_it = std::find(last_feedback_.joint_state.name.begin(),
                             last_feedback_.joint_state.name.end(), "battery");
 
-    // If the battery joint is found, update the battery voltage                        
+    // If the battery joint is found, update the battery voltage
     if (bat_it != last_feedback_.joint_state.name.end())
     {
       size_t bat_index = std::distance(last_feedback_.joint_state.name.begin(), bat_it);
@@ -206,13 +206,14 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
   /**
    * @brief Writes commands to the hardware.
-   * 
+   *
    * This function publishes the current command values to the hardware via a ROS topic.
-   * 
+   *
    * @param time The current time.
    * @param period The time period since the last write.
-   * 
-   * @return hardware_interface::return_type::OK if the write operation is successful, otherwise returns an error.
+   *
+   * @return hardware_interface::return_type::OK if the write operation is successful, otherwise
+   * returns an error.
    */
   hardware_interface::return_type SabertoothSystemInterface::write(const rclcpp::Time&,
                                                                    const rclcpp::Duration&)
@@ -243,19 +244,19 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
   /**
    * @brief Callback function for receiving feedback messages.
-   * 
+   *
    * This function is called whenever a new feedback message is received from the ROS topic.
    * It updates the last_feedback_ member variable with the received message.
-   * 
+   *
    * @param msg The received feedback message.
    */
   void SabertoothSystemInterface::feedbackCallback(
       const rugged_rover_interfaces::msg::RoverFeedback::SharedPtr msg)
   {
-  // Lock the feedback mutex to ensure thread safety
+    // Lock the feedback mutex to ensure thread safety
     std::lock_guard<std::mutex> lock(feedback_mutex_);
 
-  // Update the last_feedback_ member variable with the received message
+    // Update the last_feedback_ member variable with the received message
     last_feedback_ = *msg;
   }
 
