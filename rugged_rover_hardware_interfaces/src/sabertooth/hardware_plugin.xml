@@ -1,0 +1,10 @@
+<library path="lib/librugged_rover_hardware_interfaces">
+  <class 
+    name="rugged_rover_hardware_interfaces/sabertooth/SabertoothSystemInterface"
+    type="rugged_rover_hardware_interfaces::sabertooth::SabertoothSystemInterface"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ROS 2 hardware interface for Sabertooth motor controller over serial, including joint state and voltage feedback.
+    </description>
+  </class>
+</library>
