@@ -23,5 +23,7 @@
 
   <export>
     <build_type>ament_cmake</build_type>
+    <ros2_control plugin="rugged_rover_hardware_interfaces/hardware_plugin.xml"/>
   </export>
+
 </package>

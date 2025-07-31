@@ -81,7 +81,7 @@
   <!-- ros2_control: mock interface for joint position -->
   <ros2_control name="RuggedRoverControl" type="system">
     <hardware>
-      <plugin>rugged_rover_hardware_interfaces/RuggedRoverHardwareInterface</plugin>
+      <plugin>rugged_rover_hardware_interfaces/sabertooth/SabertoothSystemInterface</plugin>
     </hardware>
     <joint name="front_left_joint">
       <command_interface name="velocity"/>
