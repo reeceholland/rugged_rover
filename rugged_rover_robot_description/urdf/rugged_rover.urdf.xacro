@@ -2,13 +2,13 @@
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="rugged_rover">
 
   <!-- Parameters -->
-  <xacro:property name="chassis_length" value="0.35"/> <!-- in meters -->
+  <xacro:property name="chassis_length" value="0.35"/>
   <xacro:property name="chassis_width" value="0.27"/>
   <xacro:property name="chassis_height" value="0.08"/>
   <xacro:property name="wheel_radius" value="0.065"/>
   <xacro:property name="wheel_width" value="0.03"/>
   <xacro:property name="wheel_x_offset" value="${chassis_length / 2 - 0.05}"/>
-  <xacro:property name="wheel_y_offset" value="${chassis_width / 2 + 0.01}"/>
+  <xacro:property name="wheel_y_offset" value="${chassis_width / 2 + 0.05}"/>
   <xacro:property name="wheel_z_offset" value="${0 - chassis_height / 2}"/>
 
   <!-- Base Link -->
@@ -40,19 +40,19 @@
   <xacro:macro name="wheel" params="name x y">
     <link name="${name}">
       <visual>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <geometry>
           <cylinder length="${wheel_width}" radius="${wheel_radius}"/>
         </geometry>
         <material name="Grey">
           <color rgba="0.5 0.5 0.5 1"/>
         </material>
-        <origin xyz="${x} ${y} ${wheel_z_offset}" rpy="1.5708 0 0"/>
       </visual>
       <collision>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <geometry>
           <cylinder length="${wheel_width}" radius="${wheel_radius}"/>
         </geometry>
-        <origin xyz="${x} ${y} ${wheel_z_offset}" rpy="1.5708 0 0"/>
       </collision>
       <inertial>
         <mass value="0.3"/>
@@ -67,7 +67,7 @@
     <joint name="${name}_joint" type="continuous">
       <parent link="base_link"/>
       <child link="${name}"/>
-        <origin xyz="${x} ${y} ${wheel_z_offset}" rpy="0 0 0"/>
+      <origin xyz="${x} ${y} ${wheel_z_offset}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
     </joint>
   </xacro:macro>
@@ -77,5 +77,32 @@
   <xacro:wheel name="right_front_wheel" x="${ wheel_x_offset}" y="${-wheel_y_offset}"/>
   <xacro:wheel name="left_rear_wheel"   x="${-wheel_x_offset}" y="${ wheel_y_offset}"/>
   <xacro:wheel name="right_rear_wheel"  x="${-wheel_x_offset}" y="${-wheel_y_offset}"/>
+
+  <!-- ros2_control: mock interface for joint position -->
+  <ros2_control name="RuggedRoverControl" type="system">
+    <hardware>
+      <plugin>rugged_rover_hardware_interfaces/RuggedRoverHardwareInterface</plugin>
+    </hardware>
+    <joint name="front_left_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="front_right_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rear_left_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="rear_right_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
 
 </robot>
