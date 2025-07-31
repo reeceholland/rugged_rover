@@ -264,6 +264,5 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
 #include "pluginlib/class_list_macros.hpp"
 
-PLUGINLIB_EXPORT_CLASS(
-  rugged_rover_hardware_interfaces::sabertooth::SabertoothSystemInterface,
-  hardware_interface::SystemInterface)
+PLUGINLIB_EXPORT_CLASS(rugged_rover_hardware_interfaces::sabertooth::SabertoothSystemInterface,
+                       hardware_interface::SystemInterface)
