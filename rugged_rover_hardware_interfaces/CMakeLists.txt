@@ -20,7 +20,7 @@ include_directories(
 )
 
 # Add the hardware interface library
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/sabertooth/sabertooth_system_interface.cpp
 )
 
