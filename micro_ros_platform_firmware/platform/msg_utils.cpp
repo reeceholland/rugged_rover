@@ -62,8 +62,10 @@ void subscription_callback(const void *msgin) {
     else if (strcmp(name, "right_front_wheel_joint") == 0)
       front_right_velocity_setpoint = velocity;
     // else if (strcmp(name, "left_rear_wheel_joint") == 0)
-    //   front_left_velocity_setpoint = velocity; // Adjust as needed for rear wheels
+    //   front_left_velocity_setpoint = velocity; // Adjust as needed for rear
+    //   wheels
     // else if (strcmp(name, "right_rear_wheel_joint") == 0)
-    //   front_right_velocity_setpoint = velocity; // Adjust as needed for rear wheels
+    //   front_right_velocity_setpoint = velocity; // Adjust as needed for rear
+    //   wheels
   }
 }

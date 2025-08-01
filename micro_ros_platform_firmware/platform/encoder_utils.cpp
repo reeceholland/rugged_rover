@@ -6,7 +6,6 @@
 Encoder frontLeftEncoder(2, 3);
 Encoder frontRightEncoder(4, 5);
 
-
 volatile long frontLeftLastTicks = 0;
 volatile long frontRightLastTicks = 0;
 float current_front_left_rads_sec = 0;

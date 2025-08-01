@@ -37,7 +37,7 @@ void setup_pid() {
 void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
                              int speed) {
 
-  //  Constrain the speed to the valid range                            
+  //  Constrain the speed to the valid range
   speed = constrain(speed, -127, 127);
 
   //  Determine the command based on the motor and speed direction
@@ -48,13 +48,13 @@ void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
 
   //  Calculate the checksum for the command
   byte checksum = (address + command + data) & 0x7F;
-  
+
   //  Construct the command packet
   byte packet[] = {address, command, data, checksum};
 
   if (SERIAL_DEBUG)
     Serial1.println(command);
-  
+
   //  Send the command packet over the specified serial port
   port.write(packet, sizeof(packet));
 }
@@ -67,12 +67,12 @@ void update_motors() {
   //  Compute the PID output for the front left motor
   front_left_pid.Compute();
 
-
   if (SERIAL_DEBUG) {
     Serial1.print("Front Left PID Output: ");
     Serial1.println(front_left_output);
   }
 
   //  Send the command to the Sabertooth motor driver for the front left motor
-  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1, front_left_velocity_setpoint*4);
+  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1,
+                          front_left_velocity_setpoint * 4);
 }
