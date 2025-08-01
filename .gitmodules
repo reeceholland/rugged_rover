@@ -1,0 +1,4 @@
+[submodule "micro_ros_agent"]
+	path = micro_ros_agent
+	url = https://github.com/micro-ROS/micro-ROS-Agent.git
+	branch = humble
