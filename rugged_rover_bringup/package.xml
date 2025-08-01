@@ -13,7 +13,7 @@
   <depend>controller_manager</depend>
   <depend>ros2_control</depend>
   <depend>robot_state_publisher</depend>
-  <depend>rugged_rover_description</depend>
+  <depend>rugged_rover_robot_description</depend>
   <depend>rugged_rover_control</depend>
   <depend>rugged_rover_hardware_interfaces</depend>
 

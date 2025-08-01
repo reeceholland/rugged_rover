@@ -11,9 +11,14 @@ find_package(rclcpp REQUIRED)
 find_package(controller_manager REQUIRED)
 find_package(ros2_control REQUIRED)
 find_package(robot_state_publisher REQUIRED)
-find_package(rugged_rover_description REQUIRED)
+find_package(rugged_rover_robot_description REQUIRED)
 find_package(rugged_rover_control REQUIRED)
 find_package(rugged_rover_hardware_interfaces REQUIRED)
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

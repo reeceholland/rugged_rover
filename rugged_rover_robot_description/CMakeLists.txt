@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 
 # Optional: install xacro files and meshes
 install(
-  DIRECTORY urdf meshes launch rviz config
+  DIRECTORY urdf launch rviz config
   DESTINATION share/${PROJECT_NAME}
 )
 
