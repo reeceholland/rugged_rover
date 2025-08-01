@@ -8,15 +8,17 @@ bool SERIAL_DEBUG = true;
 
 void setup() {
   ros_setup();
+    setup_pid();
 }
 
 void loop() {
-  setup_pid();
+
   unsigned long now = millis();
   if (now - lastEncoderSampleTime >= 100) {
     
     sample_encoders();
     publish_joint_state_message();
+    Serial1.print(now - lastEncoderSampleTime);
     update_motors();
   }
   spin_ros_executor();

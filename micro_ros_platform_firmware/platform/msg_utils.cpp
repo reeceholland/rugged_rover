@@ -1,10 +1,10 @@
 #include "msg_utils.hpp"
-#include "msg_utils.hpp"
-#include "ros_interface.hpp"
-#include "motor_control.hpp"
+#include "config.hpp"
 #include "encoder_utils.hpp"
 #include "error_handling.hpp"
-#include "config.hpp"
+#include "motor_control.hpp"
+#include "msg_utils.hpp"
+#include "ros_interface.hpp"
 #include <cstring>
 
 rosidl_runtime_c__String name_data[MAX_JOINTS];
@@ -28,13 +28,21 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState &msg) {
   msg.effort.size = 0;
   msg.effort.capacity = 0;
 
-  name_data[0].data = (char *)"front_left_joint";
+  name_data[0].data = (char *)"left_front_wheel_joint";
   name_data[0].size = strlen(name_data[0].data);
   name_data[0].capacity = MAX_NAME_LEN;
 
-  name_data[1].data = (char *)"front_right_joint";
+  name_data[1].data = (char *)"right_front_wheel_joint";
   name_data[1].size = strlen(name_data[1].data);
   name_data[1].capacity = MAX_NAME_LEN;
+
+  // name_data[2].data = (char *)"left_rear_wheel_joint";
+  // name_data[2].size = strlen(name_data[2].data);
+  // name_data[2].capacity = MAX_NAME_LEN;
+
+  // name_data[3].data = (char *)"right_rear_wheel_joint";
+  // name_data[3].size = strlen(name_data[3].data);
+  // name_data[3].capacity = MAX_NAME_LEN;
 }
 
 void publish_joint_state_message() {
@@ -44,11 +52,18 @@ void publish_joint_state_message() {
 }
 
 void subscription_callback(const void *msgin) {
-  const sensor_msgs__msg__JointState *joint_msg = (const sensor_msgs__msg__JointState *)msgin;
+  const sensor_msgs__msg__JointState *joint_msg =
+      (const sensor_msgs__msg__JointState *)msgin;
   for (size_t i = 0; i < joint_msg->name.size && i < MAX_JOINTS; i++) {
-    const char* name = joint_msg->name.data[i].data;
+    const char *name = joint_msg->name.data[i].data;
     float velocity = joint_msg->velocity.data[i];
-    if (strcmp(name, "front_left_joint") == 0) front_left_velocity_setpoint = velocity;
-    else if (strcmp(name, "front_right_joint") == 0) front_right_velocity_setpoint = velocity;
+    if (strcmp(name, "left_front_wheel_joint") == 0)
+      front_left_velocity_setpoint = velocity;
+    else if (strcmp(name, "right_front_wheel_joint") == 0)
+      front_right_velocity_setpoint = velocity;
+    // else if (strcmp(name, "left_rear_wheel_joint") == 0)
+    //   front_left_velocity_setpoint = velocity; // Adjust as needed for rear wheels
+    // else if (strcmp(name, "right_rear_wheel_joint") == 0)
+    //   front_right_velocity_setpoint = velocity; // Adjust as needed for rear wheels
   }
 }
