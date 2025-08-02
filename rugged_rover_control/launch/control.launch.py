@@ -4,25 +4,18 @@ from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+
 def generate_launch_description():
-    # Paths to packages and files
+    # Find package shares
     description_pkg = FindPackageShare("rugged_rover_robot_description")
     control_pkg = FindPackageShare("rugged_rover_control")
 
-    # Xacro to URDF
-    xacro_file = PathJoinSubstitution([
+    # Paths
+    xacro_path = PathJoinSubstitution([
         description_pkg,
         "urdf",
         "rugged_rover.urdf.xacro"
     ])
-
-    # Convert xacro output into a raw string using Command + ParameterValue
-    robot_description = {
-        "robot_description": ParameterValue(
-            Command(["xacro", xacro_file]),
-            value_type=str
-        )
-    }
 
     controllers_yaml = PathJoinSubstitution([
         control_pkg,
@@ -30,7 +23,10 @@ def generate_launch_description():
         "controllers.yaml"
     ])
 
+
+    # Launch Description
     return LaunchDescription([
+        # Micro-ROS Agent
         Node(
             package="micro_ros_agent",
             executable="micro_ros_agent",
@@ -38,26 +34,40 @@ def generate_launch_description():
             arguments=["serial", "--dev", "/dev/ttyACM0"],
             output="screen"
         ),
+
+        # Robot State Publisher
         Node(
             package="robot_state_publisher",
             executable="robot_state_publisher",
             name="robot_state_publisher",
-            parameters=[robot_description],
+            parameters=[{'robot_description': ParameterValue(
+                    Command(['xacro ', xacro_path]),
+                    value_type=str
+                )}],
             output="screen"
         ),
+
+        # ros2_control Node
         Node(
             package="controller_manager",
             executable="ros2_control_node",
             name="controller_manager",
-            parameters=[robot_description, controllers_yaml],
+            parameters=[{'robot_description': ParameterValue(
+                    Command(['xacro ', xacro_path]),
+                    value_type=str
+                )}, controllers_yaml],
             output="screen"
         ),
+
+        # Joint State Broadcaster
         Node(
             package="controller_manager",
             executable="spawner",
             arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
             output="screen"
         ),
+
+        # Differential Drive Controller
         Node(
             package="controller_manager",
             executable="spawner",
