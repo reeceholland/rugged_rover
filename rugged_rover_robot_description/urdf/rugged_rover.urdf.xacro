@@ -83,22 +83,22 @@
     <hardware>
       <plugin>rugged_rover_hardware_interfaces/sabertooth/SabertoothSystemInterface</plugin>
     </hardware>
-    <joint name="front_left_joint">
+    <joint name="left_front_wheel_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
-    <joint name="front_right_joint">
+    <joint name="right_front_wheel_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
-    <joint name="rear_left_joint">
+    <joint name="left_rear_wheel_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
-    <joint name="rear_right_joint">
+    <joint name="right_rear_wheel_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(rugged_rover_robot_description)
+project(rugged_rover_bringup)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,11 +7,17 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(controller_manager REQUIRED)
+find_package(ros2_control REQUIRED)
+find_package(robot_state_publisher REQUIRED)
+find_package(rugged_rover_robot_description REQUIRED)
+find_package(rugged_rover_control REQUIRED)
+find_package(rugged_rover_hardware_interfaces REQUIRED)
 
-# Optional: install xacro files and meshes
-install(
-  DIRECTORY urdf launch rviz config
-  DESTINATION share/${PROJECT_NAME}
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 if(BUILD_TESTING)
