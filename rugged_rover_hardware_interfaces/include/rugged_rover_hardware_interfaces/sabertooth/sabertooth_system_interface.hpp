@@ -10,8 +10,7 @@
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
-
-#include "rugged_rover_interfaces/msg/rover_feedback.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
 
 namespace rugged_rover_hardware_interfaces::sabertooth
 {
@@ -49,11 +48,11 @@ namespace rugged_rover_hardware_interfaces::sabertooth
   private:
     rclcpp::Node::SharedPtr node_;
 
-    rclcpp::Subscription<rugged_rover_interfaces::msg::RoverFeedback>::SharedPtr feedback_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr feedback_sub_;
 
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr cmd_pub_;
 
-    void feedbackCallback(const rugged_rover_interfaces::msg::RoverFeedback::SharedPtr msg);
+    void feedbackCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
 
     std::vector<double> hw_positions_;
     std::vector<double> hw_velocities_;
@@ -62,9 +61,7 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     rclcpp::Logger logger_ = rclcpp::get_logger("SabertoothSystemInterface");
 
-    double battery_voltage_mv_ = 0.0;
-
-    rugged_rover_interfaces::msg::RoverFeedback last_feedback_;
+    sensor_msgs::msg::JointState last_feedback_;
     std::mutex feedback_mutex_;
 
     friend class SabertoothInterfaceTest;

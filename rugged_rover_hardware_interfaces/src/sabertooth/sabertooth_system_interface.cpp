@@ -65,7 +65,7 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     node_ = rclcpp::Node::make_shared("sabertooth_hw_interface_node");
 
     // Create a subscription to the feedback topic
-    feedback_sub_ = node_->create_subscription<rugged_rover_interfaces::msg::RoverFeedback>(
+    feedback_sub_ = node_->create_subscription<sensor_msgs::msg::JointState>(
         "platform/motors/feedback", rclcpp::SensorDataQoS(),
         std::bind(&SabertoothSystemInterface::feedbackCallback, this, std::placeholders::_1));
 
@@ -127,10 +127,6 @@ namespace rugged_rover_hardware_interfaces::sabertooth
           joint_names_[i], hardware_interface::HW_IF_VELOCITY, &hw_velocities_[i]));
     }
 
-    // Optional battery state
-    state_interfaces.emplace_back(
-        hardware_interface::StateInterface("battery", "voltage_mv", &battery_voltage_mv_));
-
     // Return the vector of state interfaces
     return state_interfaces;
   }
@@ -171,35 +167,21 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     for (size_t i = 0; i < joint_names_.size(); ++i)
     {
       // Find the index of the joint in the last feedback message
-      auto it = std::find(last_feedback_.joint_state.name.begin(),
-                          last_feedback_.joint_state.name.end(), joint_names_[i]);
+      auto it = std::find(last_feedback_.name.begin(), last_feedback_.name.end(), joint_names_[i]);
 
       // If the joint is found.
-      if (it != last_feedback_.joint_state.name.end())
+      if (it != last_feedback_.name.end())
       {
         // Get the index of the joint in the feedback message
-        size_t index = std::distance(last_feedback_.joint_state.name.begin(), it);
+        size_t index = std::distance(last_feedback_.name.begin(), it);
 
         // Update the hardware positions and velocities if the index is valid
-        if (index < last_feedback_.joint_state.position.size())
-          hw_positions_[i] = last_feedback_.joint_state.position[index];
-        if (index < last_feedback_.joint_state.velocity.size())
-          hw_velocities_[i] = last_feedback_.joint_state.velocity[index];
+        if (index < last_feedback_.position.size())
+          hw_positions_[i] = last_feedback_.position[index];
+        if (index < last_feedback_.velocity.size())
+          hw_velocities_[i] = last_feedback_.velocity[index];
       }
     }
-
-    // Look for battery voltage in the "battery" joint, if published
-    auto bat_it = std::find(last_feedback_.joint_state.name.begin(),
-                            last_feedback_.joint_state.name.end(), "battery");
-
-    // If the battery joint is found, update the battery voltage
-    if (bat_it != last_feedback_.joint_state.name.end())
-    {
-      size_t bat_index = std::distance(last_feedback_.joint_state.name.begin(), bat_it);
-      if (bat_index < last_feedback_.joint_state.effort.size())
-        battery_voltage_mv_ = last_feedback_.joint_state.effort[bat_index];
-    }
-
     // Return OK to indicate successful read operation
     return hardware_interface::return_type::OK;
   }
@@ -250,8 +232,8 @@ namespace rugged_rover_hardware_interfaces::sabertooth
    *
    * @param msg The received feedback message.
    */
-  void SabertoothSystemInterface::feedbackCallback(
-      const rugged_rover_interfaces::msg::RoverFeedback::SharedPtr msg)
+  void
+  SabertoothSystemInterface::feedbackCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
   {
     // Lock the feedback mutex to ensure thread safety
     std::lock_guard<std::mutex> lock(feedback_mutex_);
