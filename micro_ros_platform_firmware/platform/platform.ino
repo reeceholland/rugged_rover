@@ -18,7 +18,6 @@ void loop() {
     
     sample_encoders();
     publish_joint_state_message();
-    Serial1.print(now - lastEncoderSampleTime);
     update_motors();
   }
   spin_ros_executor();

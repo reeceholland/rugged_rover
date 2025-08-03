@@ -27,7 +27,7 @@ def generate_launch_description():
             package="micro_ros_agent",
             executable="micro_ros_agent",
             name="micro_ros_agent",
-            arguments=["serial", "--dev", "/dev/ttyACM1"],
+            arguments=["serial", "--dev", "/dev/ttyACM0"],
             output="screen"
         ),
         Node(
@@ -71,9 +71,9 @@ def generate_launch_description():
         ),
 
         # Timer action to spawn controllers after a delay
-        # This action waits for 3 seconds before spawning the joint state broadcaster and diff drive controller
+        # This action waits for 4 seconds before spawning the joint state broadcaster and diff drive controller
         TimerAction(
-            period=3.0,
+            period=1.0,
             actions=[
                 Node(
                     package='controller_manager',
