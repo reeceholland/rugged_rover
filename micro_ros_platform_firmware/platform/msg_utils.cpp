@@ -37,11 +37,11 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   name_data[1].size = strlen(name_data[1].data);
   name_data[1].capacity = MAX_NAME_LEN;
 
-  name_data[2].data = (char *)"rear_left_joint";
+  name_data[2].data = (char*) "rear_left_joint";
   name_data[2].size = strlen(name_data[2].data);
   name_data[2].capacity = MAX_NAME_LEN;
 
-  name_data[3].data = (char *)"rear_right_joint";
+  name_data[3].data = (char*) "rear_right_joint";
   name_data[3].size = strlen(name_data[3].data);
   name_data[3].capacity = MAX_NAME_LEN;
 }

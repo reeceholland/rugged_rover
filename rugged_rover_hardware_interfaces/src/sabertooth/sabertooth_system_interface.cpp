@@ -167,8 +167,7 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     for (size_t i = 0; i < joint_names_.size(); ++i)
     {
       // Find the index of the joint in the last feedback message
-      auto it = std::find(last_feedback_.name.begin(),
-                          last_feedback_.name.end(), joint_names_[i]);
+      auto it = std::find(last_feedback_.name.begin(), last_feedback_.name.end(), joint_names_[i]);
 
       // If the joint is found.
       if (it != last_feedback_.name.end())
@@ -233,8 +232,8 @@ namespace rugged_rover_hardware_interfaces::sabertooth
    *
    * @param msg The received feedback message.
    */
-  void SabertoothSystemInterface::feedbackCallback(
-      const sensor_msgs::msg::JointState::SharedPtr msg)
+  void
+  SabertoothSystemInterface::feedbackCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
   {
     // Lock the feedback mutex to ensure thread safety
     std::lock_guard<std::mutex> lock(feedback_mutex_);
