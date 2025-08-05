@@ -46,6 +46,11 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     const std::vector<double>& get_hw_velocities() const { return hw_velocities_; }
 
   private:
+
+    rclcpp::executors::SingleThreadedExecutor executor_;
+
+    std::thread executor_thread_;
+    
     rclcpp::Node::SharedPtr node_;
 
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr feedback_sub_;
