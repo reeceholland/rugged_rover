@@ -61,7 +61,6 @@ TEST_F(SabertoothInterfaceTest, ExportsStateInterfaces) {
 
   EXPECT_EQ(states[0].get_prefix_name(), "front_left_joint");
   EXPECT_EQ(states[0].get_interface_name(), hardware_interface::HW_IF_POSITION);
-
 }
 
 TEST_F(SabertoothInterfaceTest, ExportsCommandInterfaces) {
