@@ -16,7 +16,8 @@ QuickPID front_left_pid(&current_front_left_rads_sec, &front_left_output,
 /**
  * @brief Function to setup the PID controllers
  */
-void setup_pid() {
+void setup_pid()
+{
   front_left_pid.SetOutputLimits(-127.0, 127.0);
   front_left_pid.SetTunings(3.0, 0.0, 0.00);
   front_left_pid.SetSampleTimeUs(100000);
@@ -34,8 +35,8 @@ void setup_pid() {
  * @param motor The motor number (1 or 2).
  * @param speed The speed value to set for the motor (-127 to 127).
  */
-void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
-                             int speed) {
+void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int speed)
+{
 
   //  Constrain the speed to the valid range
   speed = constrain(speed, -127, 127);
@@ -62,17 +63,18 @@ void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
 /**
  * @brief Function to update the motors based on the PID output.
  */
-void update_motors() {
+void update_motors()
+{
 
   //  Compute the PID output for the front left motor
   front_left_pid.Compute();
 
-  if (SERIAL_DEBUG) {
+  if (SERIAL_DEBUG)
+  {
     Serial1.print("Front Left PID Output: ");
     Serial1.println(front_left_output);
   }
 
   //  Send the command to the Sabertooth motor driver for the front left motor
-  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1,
-                          front_left_velocity_setpoint * 4);
+  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1, front_left_velocity_setpoint * 4);
 }
