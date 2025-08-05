@@ -57,34 +57,36 @@ namespace rugged_rover_hardware_interfaces::sabertooth
    * @return CallbackReturn::SUCCESS if activation is successful, otherwise
    * returns an error.
    */
-hardware_interface::CallbackReturn
-SabertoothSystemInterface::on_activate(const rclcpp_lifecycle::State&)
-{
-  // Log activation message
-  RCLCPP_INFO(rclcpp::get_logger("SabertoothSystemInterface"),
-              "Activating Sabertooth System Interface");
+  hardware_interface::CallbackReturn
+  SabertoothSystemInterface::on_activate(const rclcpp_lifecycle::State&)
+  {
+    // Log activation message
+    RCLCPP_INFO(rclcpp::get_logger("SabertoothSystemInterface"),
+                "Activating Sabertooth System Interface");
 
-  // Create a new node for the system interface
-  node_ = rclcpp::Node::make_shared("sabertooth_hw_interface_node");
+    // Create a new node for the system interface
+    node_ = rclcpp::Node::make_shared("sabertooth_hw_interface_node");
 
-  // Create a subscription to the feedback topic
-  feedback_sub_ = node_->create_subscription<sensor_msgs::msg::JointState>(
-      "platform/motors/feedback", rclcpp::SensorDataQoS(),
-      std::bind(&SabertoothSystemInterface::feedbackCallback, this, std::placeholders::_1));
+    // Create a subscription to the feedback topic
+    feedback_sub_ = node_->create_subscription<sensor_msgs::msg::JointState>(
+        "platform/motors/feedback", rclcpp::SensorDataQoS(),
+        std::bind(&SabertoothSystemInterface::feedbackCallback, this, std::placeholders::_1));
 
-  // Create a publisher for the command topic
-  cmd_pub_ = node_->create_publisher<sensor_msgs::msg::JointState>(
-      "platform/motors/cmd", rclcpp::SensorDataQoS());
+    // Create a publisher for the command topic
+    cmd_pub_ = node_->create_publisher<sensor_msgs::msg::JointState>("platform/motors/cmd",
+                                                                     rclcpp::SensorDataQoS());
 
-  // Add the node to the executor and start spinning in a background thread
-  executor_.add_node(node_);
-  executor_thread_ = std::thread([this]() {
-    RCLCPP_INFO(logger_, "Spinning executor in SabertoothSystemInterface...");
-    executor_.spin();
-  });
+    // Add the node to the executor and start spinning in a background thread
+    executor_.add_node(node_);
+    executor_thread_ = std::thread(
+        [this]()
+        {
+          RCLCPP_INFO(logger_, "Spinning executor in SabertoothSystemInterface...");
+          executor_.spin();
+        });
 
-  return hardware_interface::CallbackReturn::SUCCESS;
-}
+    return hardware_interface::CallbackReturn::SUCCESS;
+  }
 
   /**
    * @brief Deactivates the Sabertooth System Interface.
@@ -95,24 +97,24 @@ SabertoothSystemInterface::on_activate(const rclcpp_lifecycle::State&)
    * @return CallbackReturn::SUCCESS if deactivation is successful, otherwise
    * returns an error.
    */
- hardware_interface::CallbackReturn
-SabertoothSystemInterface::on_deactivate(const rclcpp_lifecycle::State&)
-{
-  RCLCPP_INFO(rclcpp::get_logger("SabertoothSystemInterface"),
-              "Deactivating hardware interface...");
+  hardware_interface::CallbackReturn
+  SabertoothSystemInterface::on_deactivate(const rclcpp_lifecycle::State&)
+  {
+    RCLCPP_INFO(rclcpp::get_logger("SabertoothSystemInterface"),
+                "Deactivating hardware interface...");
 
-  // Stop the executor and join the thread
-  executor_.cancel();
-  if (executor_thread_.joinable())
-    executor_thread_.join();
+    // Stop the executor and join the thread
+    executor_.cancel();
+    if (executor_thread_.joinable())
+      executor_thread_.join();
 
-  executor_.remove_node(node_);
-  feedback_sub_.reset();
-  cmd_pub_.reset();
-  node_.reset();
+    executor_.remove_node(node_);
+    feedback_sub_.reset();
+    cmd_pub_.reset();
+    node_.reset();
 
-  return hardware_interface::CallbackReturn::SUCCESS;
-}
+    return hardware_interface::CallbackReturn::SUCCESS;
+  }
 
   /**
    * @brief Exports the state interfaces for the Sabertooth System Interface.
