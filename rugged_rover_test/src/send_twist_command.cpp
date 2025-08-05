@@ -1,8 +1,7 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   auto node = rclcpp::Node::make_shared("twist_command_sender");
 
@@ -10,8 +9,7 @@ int main(int argc, char** argv)
 
   auto publisher = node->create_publisher<geometry_msgs::msg::Twist>(
       "micro_ros_arduino_twist_subscriber", rclcpp::QoS(10));
-  while (rclcpp::ok())
-  {
+  while (rclcpp::ok()) {
     geometry_msgs::msg::Twist msg;
 
     // Example values – you can adjust these as needed
