@@ -22,5 +22,6 @@ extern float current_front_left_rads_sec;
 extern float current_front_right_rads_sec;
 
 void setup_pid();
-void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int speed);
+void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
+                             int speed);
 void update_motors();
