@@ -143,9 +143,9 @@ def generate_launch_description():
             }.items(),
         ),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(d435_launch),
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(d435_launch),
+        # ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(rplidar_launch),
