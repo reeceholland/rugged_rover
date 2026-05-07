@@ -20,7 +20,8 @@ unsigned long lastEncoderSampleTime = 0;
  * the last sample, and converts that to radians per second based on the defined
  * gear ratio and pulses per revolution.
  */
-void sample_encoders() {
+void sample_encoders()
+{
   unsigned long now = millis();
 
   //  Read the current encoder values
@@ -38,10 +39,8 @@ void sample_encoders() {
   //  Convert ticks per second to radians per second
   //  The gear ratio multiplier is used to adjust the ticks based on the gear
   //  ratio of the motors
-  current_front_left_rads_sec =
-      (flTicksSec / (PULSES_PER_REVOLUTION * GEAR_RATIO_MULTIPLIER)) * -1;
-  current_front_right_rads_sec =
-      frTicksSec / (PULSES_PER_REVOLUTION * GEAR_RATIO_MULTIPLIER);
+  current_front_left_rads_sec = (flTicksSec / (PULSES_PER_REVOLUTION * GEAR_RATIO_MULTIPLIER)) * -1;
+  current_front_right_rads_sec = frTicksSec / (PULSES_PER_REVOLUTION * GEAR_RATIO_MULTIPLIER);
 
   //  Update the last ticks for the next sample
   frontLeftLastTicks = currentFL;
@@ -50,7 +49,8 @@ void sample_encoders() {
   //  Update the last sample time
   lastEncoderSampleTime = now;
 
-  if (SERIAL_DEBUG) {
+  if (SERIAL_DEBUG)
+  {
     Serial1.print("FL: ");
     Serial1.print(current_front_left_rads_sec);
     Serial1.print(" rad/s, FR: ");
