@@ -160,6 +160,10 @@ SabertoothSystemInterface::export_command_interfaces() {
 hardware_interface::return_type
 SabertoothSystemInterface::read(const rclcpp::Time &,
                                 const rclcpp::Duration &) {
+  if(node_) {
+    rclcpp::spin_some(node_);
+  }
+  
   std::lock_guard<std::mutex> lock(feedback_mutex_);
 
   // Update positions and velocities from the most recent feedback
