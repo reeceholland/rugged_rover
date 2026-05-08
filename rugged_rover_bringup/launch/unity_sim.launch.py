@@ -58,7 +58,7 @@ def generate_launch_description():
             package="robot_state_publisher",
             executable="robot_state_publisher",
             name="robot_state_publisher",
-            parameters=[robot_description],
+            parameters=[robot_description, {"use_sim_time": True}],
             output="screen",
         ),
 
@@ -69,12 +69,13 @@ def generate_launch_description():
             parameters=[
                 robot_description,
                 controller_manager_params,
+                {"use_sim_time": True},
             ],
             output="screen",
         ),
 
         TimerAction(
-            period=2.0,
+            period=4.0,
             actions=[
                 Node(
                     package="controller_manager",
@@ -83,6 +84,7 @@ def generate_launch_description():
                         "joint_state_broadcaster",
                         "--controller-manager",
                         "/controller_manager",
+                        "--activate",
                     ],
                     output="screen",
                 ),
@@ -93,6 +95,7 @@ def generate_launch_description():
                         "diff_drive_controller",
                         "--controller-manager",
                         "/controller_manager",
+                        "--activate",
                     ],
                     output="screen",
                 ),

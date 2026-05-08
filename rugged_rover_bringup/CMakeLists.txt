@@ -16,8 +16,14 @@ find_package(rugged_rover_control REQUIRED)
 find_package(rugged_rover_hardware_interfaces REQUIRED)
 
 install(DIRECTORY
+  config
   launch
   DESTINATION share/${PROJECT_NAME}/
+)
+
+install(PROGRAMS
+  scripts/cmd_vel_to_stamped.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)

@@ -74,7 +74,7 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     // Create a publisher for the command topic
     cmd_pub_ = node_->create_publisher<sensor_msgs::msg::JointState>("platform/motors/cmd",
-                                                                     rclcpp::SensorDataQoS());
+                                                                     rclcpp::QoS(10).reliable());
 
     // Return success if activation is complete
     return hardware_interface::CallbackReturn::SUCCESS;
