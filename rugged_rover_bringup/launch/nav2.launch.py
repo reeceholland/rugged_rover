@@ -48,16 +48,20 @@ def generate_launch_description():
         ),
 
         Node(
-            package="rugged_rover_bringup",
-            executable="cmd_vel_to_stamped.py",
+            package="topic_tools",
+            executable="transform",
             name="cmd_vel_to_diff_drive",
-            parameters=[
-                {
-                    "use_sim_time": use_sim_time,
-                    "input_topic": "/cmd_vel",
-                    "output_topic": "/diff_drive_controller/cmd_vel",
-                    "frame_id": "base_link",
-                }
+            arguments=[
+                "/cmd_vel",
+                "/diff_drive_controller/cmd_vel",
+                "geometry_msgs/msg/TwistStamped",
+                "geometry_msgs.msg.TwistStamped(header=std_msgs.msg.Header(frame_id='base_link'), twist=m)",
+                "--import",
+                "geometry_msgs",
+                "std_msgs",
+                "--wait-for-start",
+                "--qos-reliability",
+                "reliable",
             ],
             output="screen",
         ),
