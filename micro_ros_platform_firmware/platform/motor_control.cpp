@@ -52,6 +52,17 @@ void setup_pid() {
   front_right_pid.SetMode(QuickPID::Control::automatic);
 }
 
+void stop_motors() {
+  front_left_velocity_setpoint = 0.0;
+  front_right_velocity_setpoint = 0.0;
+  front_left_output = 0.0;
+  front_right_output = 0.0;
+  front_left_pid.Reset();
+  front_right_pid.Reset();
+  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1, 0);
+  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 2, 0);
+}
+
 /**
  * @brief Function to send a command to the Sabertooth motor driver.
  *
@@ -89,6 +100,11 @@ void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
  * @brief Function to update the motors based on the PID output.
  */
 void update_motors() {
+  if (abs(front_left_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S &&
+      abs(front_right_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S) {
+    stop_motors();
+    return;
+  }
 
   //  Compute the PID output for both motors.
   front_left_pid.Compute();

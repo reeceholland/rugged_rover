@@ -30,8 +30,7 @@ void handle_serial_command(const String &line) {
   }
 
   if (trimmed == "s" || trimmed == "S" || trimmed == "stop") {
-    front_left_velocity_setpoint = 0.0;
-    front_right_velocity_setpoint = 0.0;
+    stop_motors();
     Serial.println("Setpoints: left=0.000 rad/s, right=0.000 rad/s");
     return;
   }
@@ -87,12 +86,12 @@ void read_serial_commands() {
 }  // namespace
 
 void setup() {
-  Serial.begin(115200);
   Serial2.begin(9600);
 
   if (USE_ROS) {
     ros_setup();
   } else {
+    Serial.begin(115200);
     delay(1000);
     print_serial_help();
   }

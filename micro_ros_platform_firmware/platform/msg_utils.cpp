@@ -100,6 +100,11 @@ void subscription_callback(const void *msgin) {
     else if (strcmp(name, "rear_right_joint") == 0)
       front_right_velocity_setpoint = velocity;
   }
+
+  if (abs(front_left_velocity_setpoint) <= 0.05 &&
+      abs(front_right_velocity_setpoint) <= 0.05) {
+    stop_motors();
+  }
 }
 #else
 void publish_joint_state_message() {}

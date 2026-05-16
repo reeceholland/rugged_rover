@@ -5,6 +5,7 @@
 #include "error_handling.hpp"
 #include "motor_control.hpp"
 #include "msg_utils.hpp"
+#include <rmw_microros/ping.h>
 #include <rclc/executor.h>
 #include <rmw/qos_profiles.h>
 #include <sensor_msgs/msg/joint_state.h>
@@ -36,8 +37,14 @@ void ros_setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
 
-  //  Wait for the serial connection to establish
-  delay(2000);
+  // Give the agent a moment to appear before creating ROS entities. This is
+  // especially helpful after USB reconnects and Teensy uploads.
+  while (rmw_uros_ping_agent(100, 5) != RMW_RET_OK) {
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    delay(100);
+  }
+
+  digitalWrite(LED_PIN, HIGH);
 
   // ROS node and entities
   allocator = rcl_get_default_allocator();
@@ -82,7 +89,7 @@ void ros_setup() {
  */
 void spin_ros_executor() {
   //  Spin the executor to process incoming messages
-  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
+  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(5)));
 }
 #else
 void ros_setup() {}
