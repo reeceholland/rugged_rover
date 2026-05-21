@@ -51,6 +51,13 @@ def generate_launch_description():
                 "ROS_IP": "127.0.0.1",
                 "ROS_TCP_PORT": 10000,
             }],
+            remappings=[
+                # Keep Unity's pose estimate available for comparison, but do not let
+                # it own the navigation odom topic or odom -> base_link transform.
+                ("/odom", "/ground_truth/odom"),
+                ("/tf", "/unity/tf"),
+                ("/tf_static", "/unity/tf_static"),
+            ],
             output="screen",
         ),
 
@@ -70,6 +77,11 @@ def generate_launch_description():
                 robot_description,
                 controller_manager_params,
                 {"use_sim_time": True},
+            ],
+            remappings=[
+                # diff_drive_controller publishes its odometry under the controller
+                # namespace by default. Nav2 expects the rover odometry on /odom.
+                ("/diff_drive_controller/odom", "/odom"),
             ],
             output="screen",
         ),
