@@ -57,6 +57,10 @@ def generate_launch_description():
                 ("/odom", "/ground_truth/odom"),
                 ("/tf", "/unity/tf"),
                 ("/tf_static", "/unity/tf_static"),
+
+                # Unity is the upstream motor feedback producer. Route it through
+                # fault injection before ros2_control consumes it.
+                ("/platform/motors/feedback", "/platform/motors/feedback_raw"),
             ],
             output="screen",
         ),
@@ -79,9 +83,10 @@ def generate_launch_description():
                 {"use_sim_time": True},
             ],
             remappings=[
-                # diff_drive_controller publishes its odometry under the controller
-                # namespace by default. Nav2 expects the rover odometry on /odom.
-                ("/diff_drive_controller/odom", "/odom"),
+                # diff_drive_controller publishes wheel-derived odometry under the
+                # controller namespace. Fault injection consumes /odom_raw and
+                # republishes the possibly faulted stream on /odom for Nav2/SLAM.
+                ("/diff_drive_controller/odom", "/odom_raw"),
             ],
             output="screen",
         ),
