@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+﻿cmake_minimum_required(VERSION 3.8)
 project(rugged_rover_robot_description)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 
 # Optional: install xacro files and meshes
 install(
-  DIRECTORY urdf launch rviz config
+  DIRECTORY urdf launch rviz config meshes
   DESTINATION share/${PROJECT_NAME}
 )
 
