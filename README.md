@@ -235,6 +235,41 @@ ros2 topic echo /platform/motors/cmd --once
 ros2 control list_controllers
 ```
 
+## Joystick Teleop
+
+Start joystick teleop after the main hardware or Unity sim stack is running:
+
+```bash
+ros2 launch rugged_rover_bringup joy.launch.py
+```
+
+By default this launches `joy_node` and `teleop_twist_joy`, then remaps the output directly to:
+
+```text
+/diff_drive_controller/cmd_vel
+```
+
+The default config uses an Xbox-style layout:
+
+- Hold `LB` to enable driving
+- Hold `RB` as well for turbo speed
+- Left stick vertical controls forward and reverse
+- Right stick horizontal controls rotation
+
+Use a different joystick device id if needed:
+
+```bash
+ros2 launch rugged_rover_bringup joy.launch.py joy_dev:=1
+```
+
+Debug the controller and teleop mapping with:
+
+```bash
+ros2 launch rugged_rover_bringup joy_debug.launch.py
+```
+
+That launch prints both raw `/joy` messages and the generated `/diff_drive_controller/cmd_vel` commands.
+
 ## Teensy Firmware Notes
 
 The firmware lives in:

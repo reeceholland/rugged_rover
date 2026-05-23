@@ -1,0 +1,32 @@
+joy_node:
+  ros__parameters:
+    device_id: 0
+    deadzone: 0.15
+    autorepeat_rate: 20.0
+
+teleop_twist_joy_node:
+  ros__parameters:
+    # Hold this button while driving. On many Xbox-style controllers this is LB.
+    enable_button: 4
+
+    # Hold this button as well for the faster scale. On many Xbox-style controllers this is RB.
+    enable_turbo_button: 5
+
+    # Left stick vertical controls forward/back.
+    axis_linear:
+      x: 1
+    scale_linear:
+      x: 0.30
+    scale_linear_turbo:
+      x: 0.60
+
+    # Right stick horizontal controls yaw.
+    axis_angular:
+      yaw: 3
+    scale_angular:
+      yaw: 1.20
+    scale_angular_turbo:
+      yaw: 2.00
+
+    # ROS 2 Jazzy diff_drive_controller subscribes to TwistStamped by default.
+    publish_stamped_twist: true
