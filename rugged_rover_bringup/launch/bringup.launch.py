@@ -3,7 +3,7 @@ from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
-from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.actions import ExecuteProcess, IncludeLaunchDescription, TimerAction
 from launch_ros.parameter_descriptions import ParameterValue
 
 
@@ -17,9 +17,15 @@ def generate_launch_description():
 
     # Construct the path to the controller configuration file
     controller_config = PathJoinSubstitution([
-        FindPackageShare('rugged_rover_robot_description'),
+        FindPackageShare('rugged_rover_control'),
         'config',
-        'controller_config.yaml'
+        'controllers.yaml'
+    ])
+
+    imu_launch = PathJoinSubstitution([
+        FindPackageShare('razor_imu'),
+        'launch',
+        'razor.launch.py'
     ])
 
     ekf_launch = PathJoinSubstitution([
@@ -34,7 +40,7 @@ def generate_launch_description():
             package="micro_ros_agent",
             executable="micro_ros_agent",
             name="micro_ros_agent",
-            arguments=["serial", "--dev", "/dev/ttyACM0"],
+            arguments=["serial", "--dev", "/dev/serial/by-id/usb-Teensyduino_USB_Serial_15611330-if00"],
             output="screen"
         ),
         Node(
@@ -49,6 +55,9 @@ def generate_launch_description():
             }]
         ),
         IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(imu_launch),
+        ),
+        IncludeLaunchDescription(
             PythonLaunchDescriptionSource(ekf_launch),
             launch_arguments={
                 'use_sim_time': 'false',
@@ -59,17 +68,17 @@ def generate_launch_description():
         ),
         # RViz2 for visualization
         # This node launches RViz2 with a predefined configuration file
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', PathJoinSubstitution([
-                FindPackageShare('rugged_rover_robot_description'),
-                'rviz',
-                'view.rviz'
-            ])],
-            output='screen'
-        ),
+        # Node(
+        #     package='rviz2',
+        #     executable='rviz2',
+        #     name='rviz2',
+        #     arguments=['-d', PathJoinSubstitution([
+        #         FindPackageShare('rugged_rover_robot_description'),
+        #         'rviz',
+        #         'view.rviz'
+        #     ])],
+        #     output='screen'
+        # ),
 
         # ROS 2 Control Node
         # This node initializes the ROS 2 control framework with the robot description and controller configuration
@@ -89,18 +98,18 @@ def generate_launch_description():
         # Timer action to spawn controllers after a delay
         # This action waits for 4 seconds before spawning the joint state broadcaster and diff drive controller
         TimerAction(
-            period=1.0,
+            period=4.0,
             actions=[
                 Node(
                     package='controller_manager',
                     executable='spawner',
-                    arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+                    arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager",],
                     output="screen"
                 ),
                 Node(
                     package='controller_manager',
                     executable='spawner',
-                    arguments=["diff_drive_controller", "--controller-manager", "/controller_manager"],
+                    arguments=["diff_drive_controller", "--controller-manager", "/controller_manager",],
                     output="screen"
                 )
             ]
