@@ -1,5 +1,6 @@
 from launch import LaunchDescription
-from launch.actions import TimerAction
+from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -19,6 +20,12 @@ def generate_launch_description():
         description_pkg,
         "config",
         "unity_controller_params.yaml",
+    ])
+
+    ekf_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "ekf.launch.py",
     ])
 
     robot_description = {
@@ -89,6 +96,16 @@ def generate_launch_description():
                 ("/diff_drive_controller/odom", "/odom_raw"),
             ],
             output="screen",
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(ekf_launch),
+            launch_arguments={
+                "use_sim_time": "true",
+                "odom_topic": "/odom_raw",
+                "imu_topic": "/imu/data",
+                "output_odom_topic": "/odom",
+            }.items(),
         ),
 
         TimerAction(

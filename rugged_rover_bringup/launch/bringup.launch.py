@@ -1,8 +1,9 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
-from launch.actions import TimerAction
+from launch.actions import IncludeLaunchDescription, TimerAction
 from launch_ros.parameter_descriptions import ParameterValue
 
 
@@ -19,6 +20,12 @@ def generate_launch_description():
         FindPackageShare('rugged_rover_robot_description'),
         'config',
         'controller_config.yaml'
+    ])
+
+    ekf_launch = PathJoinSubstitution([
+        FindPackageShare('rugged_rover_bringup'),
+        'launch',
+        'ekf.launch.py'
     ])
 
     # Create the launch description
@@ -40,6 +47,15 @@ def generate_launch_description():
                     value_type=str
                 )
             }]
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(ekf_launch),
+            launch_arguments={
+                'use_sim_time': 'false',
+                'odom_topic': '/diff_drive_controller/odom',
+                'imu_topic': '/imu/data',
+                'output_odom_topic': '/odom',
+            }.items(),
         ),
         # RViz2 for visualization
         # This node launches RViz2 with a predefined configuration file
