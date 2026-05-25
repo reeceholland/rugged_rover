@@ -2,3 +2,6 @@
 	path = micro_ros_agent
 	url = https://github.com/micro-ROS/micro-ROS-Agent.git
 	branch = humble
+[submodule "rugged_rover_imu"]
+	path = rugged_rover_imu
+	url = https://github.com/reeceholland/razor_imu.git
