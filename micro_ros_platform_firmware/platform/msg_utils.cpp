@@ -14,16 +14,17 @@ char name_buffer[MAX_JOINTS][MAX_NAME_LEN];
 double position_data[MAX_JOINTS];
 double velocity_data[MAX_JOINTS];
 
-namespace {
+namespace
+{
 
-const char *const JOINT_NAMES[MAX_JOINTS] = {
-    "front_left_joint",
-    "front_right_joint",
-    "rear_left_joint",
-    "rear_right_joint",
-};
+  const char* const JOINT_NAMES[MAX_JOINTS] = {
+      "front_left_joint",
+      "front_right_joint",
+      "rear_left_joint",
+      "rear_right_joint",
+  };
 
-}  // namespace
+} // namespace
 
 /**
  * @brief Initialise the JointState message with default values.
@@ -33,7 +34,8 @@ const char *const JOINT_NAMES[MAX_JOINTS] = {
  *
  * @param msg The JointState message to initialize.
  */
-void initialise_joint_state_message(sensor_msgs__msg__JointState &msg) {
+void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
+{
   msg.name.data = name_data;
   msg.name.size = 4;
   msg.name.capacity = MAX_JOINTS;
@@ -50,7 +52,8 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState &msg) {
   msg.effort.size = 0;
   msg.effort.capacity = 0;
 
-  for (size_t i = 0; i < MAX_JOINTS; ++i) {
+  for (size_t i = 0; i < MAX_JOINTS; ++i)
+  {
     strncpy(name_buffer[i], JOINT_NAMES[i], MAX_NAME_LEN - 1);
     name_buffer[i][MAX_NAME_LEN - 1] = '\0';
     name_data[i].data = name_buffer[i];
@@ -68,7 +71,8 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState &msg) {
  * current velocities of the front left and front right motors, then publishes
  * the message.
  */
-void publish_joint_state_message() {
+void publish_joint_state_message()
+{
   feedback_msg.position.data[0] = current_front_left_position_rad;
   feedback_msg.position.data[1] = current_front_right_position_rad;
   feedback_msg.position.data[2] = current_front_left_position_rad;
@@ -91,15 +95,16 @@ void publish_joint_state_message() {
  *
  * @param msgin Pointer to the incoming JointState message.
  */
-void subscription_callback(const void *msgin) {
+void subscription_callback(const void* msgin)
+{
   //  Cast the incoming message to the expected type
-  const sensor_msgs__msg__JointState *joint_msg =
-      (const sensor_msgs__msg__JointState *)msgin;
+  const sensor_msgs__msg__JointState* joint_msg = (const sensor_msgs__msg__JointState*) msgin;
 
   //  For each joint in the message, check the name and update the corresponding
   //  velocity setpoint
-  for (size_t i = 0; i < joint_msg->name.size && i < MAX_JOINTS; i++) {
-    const char *name = joint_msg->name.data[i].data;
+  for (size_t i = 0; i < joint_msg->name.size && i < MAX_JOINTS; i++)
+  {
+    const char* name = joint_msg->name.data[i].data;
     float velocity = joint_msg->velocity.data[i];
     if (strcmp(name, "front_left_joint") == 0)
       front_left_velocity_setpoint = velocity;
@@ -111,8 +116,8 @@ void subscription_callback(const void *msgin) {
       front_right_velocity_setpoint = velocity;
   }
 
-  if (abs(front_left_velocity_setpoint) <= 0.05 &&
-      abs(front_right_velocity_setpoint) <= 0.05) {
+  if (abs(front_left_velocity_setpoint) <= 0.05 && abs(front_right_velocity_setpoint) <= 0.05)
+  {
     stop_motors();
   }
 }

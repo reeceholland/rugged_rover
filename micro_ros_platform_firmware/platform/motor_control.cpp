@@ -1,25 +1,26 @@
 #include "motor_control.hpp"
 #include "config.hpp"
 
-namespace {
+namespace
+{
 
-constexpr int LEFT_FEEDFORWARD_COMMAND = 10;
-constexpr int RIGHT_FEEDFORWARD_COMMAND = 13;
-constexpr float SETPOINT_DEADBAND_RAD_S = 0.05;
+  constexpr int LEFT_FEEDFORWARD_COMMAND = 10;
+  constexpr int RIGHT_FEEDFORWARD_COMMAND = 13;
+  constexpr float SETPOINT_DEADBAND_RAD_S = 0.05;
 
-int command_with_feedforward(float pid_output, float setpoint,
-                             int feedforward_command) {
-  if (abs(setpoint) <= SETPOINT_DEADBAND_RAD_S) {
-    return 0;
+  int command_with_feedforward(float pid_output, float setpoint, int feedforward_command)
+  {
+    if (abs(setpoint) <= SETPOINT_DEADBAND_RAD_S)
+    {
+      return 0;
+    }
+
+    const float feedforward = setpoint > 0.0 ? feedforward_command : -feedforward_command;
+
+    return static_cast<int>(pid_output + feedforward);
   }
 
-  const float feedforward =
-      setpoint > 0.0 ? feedforward_command : -feedforward_command;
-
-  return static_cast<int>(pid_output + feedforward);
-}
-
-}  // namespace
+} // namespace
 
 //  Motor velocity setpoints
 float front_left_velocity_setpoint = 0;
@@ -38,7 +39,8 @@ QuickPID front_right_pid(&current_front_right_rads_sec, &front_right_output,
 /**
  * @brief Function to setup the PID controllers
  */
-void setup_pid() {
+void setup_pid()
+{
   front_left_pid.SetOutputLimits(-127.0, 127.0);
   front_right_pid.SetOutputLimits(-127.0, 127.0);
 
@@ -52,7 +54,8 @@ void setup_pid() {
   front_right_pid.SetMode(QuickPID::Control::automatic);
 }
 
-void stop_motors() {
+void stop_motors()
+{
   front_left_velocity_setpoint = 0.0;
   front_right_velocity_setpoint = 0.0;
   front_left_output = 0.0;
@@ -74,8 +77,8 @@ void stop_motors() {
  * @param motor The motor number (1 or 2).
  * @param speed The speed value to set for the motor (-127 to 127).
  */
-void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
-                             int speed) {
+void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int speed)
+{
 
   //  Constrain the speed to the valid range
   speed = constrain(speed, -127, 127);
@@ -99,9 +102,11 @@ void send_sabertooth_command(HardwareSerial &port, byte address, byte motor,
 /**
  * @brief Function to update the motors based on the PID output.
  */
-void update_motors() {
+void update_motors()
+{
   if (abs(front_left_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S &&
-      abs(front_right_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S) {
+      abs(front_right_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S)
+  {
     stop_motors();
     return;
   }
@@ -110,7 +115,8 @@ void update_motors() {
   front_left_pid.Compute();
   front_right_pid.Compute();
 
-  if (SERIAL_DEBUG) {
+  if (SERIAL_DEBUG)
+  {
     Serial.print("FL setpoint: ");
     Serial.print(front_left_velocity_setpoint);
     Serial.print(" measured: ");
@@ -125,14 +131,13 @@ void update_motors() {
     Serial.println(front_right_output);
   }
 
-  const int front_left_command =
-      command_with_feedforward(front_left_output, front_left_velocity_setpoint,
-                               LEFT_FEEDFORWARD_COMMAND);
-  const int front_right_command =
-      -command_with_feedforward(front_right_output, front_right_velocity_setpoint,
-                                RIGHT_FEEDFORWARD_COMMAND);
+  const int front_left_command = command_with_feedforward(
+      front_left_output, front_left_velocity_setpoint, LEFT_FEEDFORWARD_COMMAND);
+  const int front_right_command = -command_with_feedforward(
+      front_right_output, front_right_velocity_setpoint, RIGHT_FEEDFORWARD_COMMAND);
 
-  if (SERIAL_DEBUG) {
+  if (SERIAL_DEBUG)
+  {
     Serial.print(" commands: FL=");
     Serial.print(front_left_command);
     Serial.print(" FR=");
