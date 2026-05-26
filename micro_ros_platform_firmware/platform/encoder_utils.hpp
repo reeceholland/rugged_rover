@@ -4,6 +4,8 @@
 
 extern volatile long frontLeftLastTicks;
 extern volatile long frontRightLastTicks;
+extern float current_front_left_position_rad;
+extern float current_front_right_position_rad;
 extern float current_front_left_rads_sec;
 extern float current_front_right_rads_sec;
 extern unsigned long lastEncoderSampleTime;
