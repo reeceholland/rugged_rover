@@ -1,103 +1,199 @@
-<?xml version="1.0"?>
+﻿<?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="rugged_rover">
 
-  <!-- Parameters -->
-  <xacro:property name="chassis_length" value="0.35"/>
-  <xacro:property name="chassis_width" value="0.27"/>
-  <xacro:property name="chassis_height" value="0.08"/>
-  <xacro:property name="wheel_radius" value="0.065"/>
-  <xacro:property name="wheel_width" value="0.03"/>
-  <xacro:property name="wheel_x_offset" value="${chassis_length / 2 - 0.05}"/>
-  <xacro:property name="wheel_y_offset" value="${chassis_width / 2 + 0.05}"/>
-  <xacro:property name="wheel_z_offset" value="${0 - chassis_height / 2}"/>
+  <!-- Dimensions are in meters. ROS convention: X forward, Y left, Z up. -->
+  <xacro:property name="chassis_length" value="0.320"/>
+  <xacro:property name="chassis_width" value="0.241"/>
+  <xacro:property name="chassis_height" value="0.0785"/>
 
-  <!-- Base Link -->
-  <link name="base_link">
+  <xacro:property name="wheel_radius" value="0.079"/>
+  <xacro:property name="wheel_width" value="0.060"/>
+  <xacro:property name="wheel_x_offset" value="0.120"/>
+  <xacro:property name="wheel_y_offset" value="0.205"/>
+  <xacro:property name="wheel_z_offset" value="0.079"/>
+  <xacro:property name="chassis_bottom_z_offset" value="${wheel_z_offset - chassis_height}"/>
+
+  <xacro:property name="chassis_mesh" value="package://rugged_rover_robot_description/meshes/A4WD3-Chassis-Solid.stl"/>
+  <xacro:property name="wheel_mesh" value="package://rugged_rover_robot_description/meshes/A4WD3-Wheel.stl"/>
+
+  <material name="Black">
+    <color rgba="0.02 0.02 0.02 1"/>
+  </material>
+
+  <material name="Grey">
+    <color rgba="0.5 0.5 0.5 1"/>
+  </material>
+
+  <material name="CameraBlack">
+    <color rgba="0.01 0.01 0.01 1"/>
+  </material>
+
+  <material name="LidarBlue">
+    <color rgba="0.05 0.25 0.8 1"/>
+  </material>
+
+  <material name="Charcoal">
+  <color rgba="0.12 0.12 0.12 1"/>
+  </material>
+
+  <material name="Graphite">
+  <color rgba="0.16 0.16 0.17 1"/>
+  </material>
+
+  <!-- Navigation/control reference frame. Keep this clean and centered. -->
+  <link name="base_link"/>
+
+  <link name="chassis_link">
     <visual>
+      <!-- Adjust rpy/scale here if the exported STL appears rotated or wrong-sized in RViz. -->
+      <origin xyz="0 0 ${chassis_height / 2.0}" rpy="0 0 0"/>
       <geometry>
-        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        <mesh filename="${chassis_mesh}" scale="0.001 0.001 0.001"/>
       </geometry>
-      <material name="Black">
-        <color rgba="0 0 0 1"/>
-      </material>
+      <material name="Graphite"/>
     </visual>
+
     <collision>
+      <origin xyz="0 0 ${chassis_height / 2.0}" rpy="0 0 0"/>
       <geometry>
         <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
       </geometry>
     </collision>
+
     <inertial>
-      <mass value="5.0"/>
+      <mass value="12.0"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <inertia
-        ixx="0.1" ixy="0.0" ixz="0.0"
-        iyy="0.1" iyz="0.0"
-        izz="0.1"/>
+        ixx="0.08" ixy="0.0" ixz="0.0"
+        iyy="0.12" iyz="0.0"
+        izz="0.14"/>
     </inertial>
   </link>
 
-  <!-- Wheel Macro -->
-  <xacro:macro name="wheel" params="name x y">
-    <link name="${name}">
+  <joint name="base_to_chassis" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_link"/>
+    <origin xyz="0 0 ${chassis_bottom_z_offset}" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:macro name="wheel" params="link_name joint_name x y visual_rpy">
+    <link name="${link_name}">
       <visual>
-        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="${visual_rpy}"/>
         <geometry>
-          <cylinder length="${wheel_width}" radius="${wheel_radius}"/>
+          <mesh filename="${wheel_mesh}" scale="0.001 0.001 0.001"/>
         </geometry>
-        <material name="Grey">
-          <color rgba="0.5 0.5 0.5 1"/>
-        </material>
+        <material name="Charcoal"/>
       </visual>
+
       <collision>
-        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
         <geometry>
           <cylinder length="${wheel_width}" radius="${wheel_radius}"/>
         </geometry>
       </collision>
+
       <inertial>
-        <mass value="0.3"/>
+        <mass value="2.0"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <inertia
-          ixx="0.01" ixy="0.0" ixz="0.0"
-          iyy="0.01" iyz="0.0"
-          izz="0.01"/>
+          ixx="0.003" ixy="0.0" ixz="0.0"
+          iyy="0.003" iyz="0.0"
+          izz="0.003"/>
       </inertial>
     </link>
 
-    <joint name="${name}_joint" type="continuous">
+    <joint name="${joint_name}" type="continuous">
       <parent link="base_link"/>
-      <child link="${name}"/>
+      <child link="${link_name}"/>
       <origin xyz="${x} ${y} ${wheel_z_offset}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
     </joint>
   </xacro:macro>
 
-  <!-- Four Wheels -->
-  <xacro:wheel name="front_left"  x="${ wheel_x_offset}" y="${ wheel_y_offset}"/>
-  <xacro:wheel name="front_right" x="${ wheel_x_offset}" y="${-wheel_y_offset}"/>
-  <xacro:wheel name="rear_left"   x="${-wheel_x_offset}" y="${ wheel_y_offset}"/>
-  <xacro:wheel name="rear_right"  x="${-wheel_x_offset}" y="${-wheel_y_offset}"/>
+  <xacro:wheel
+    link_name="front_left_wheel_link"
+    joint_name="front_left_joint"
+    x="${wheel_x_offset}"
+    y="${wheel_y_offset}"
+    visual_rpy="0 0 3.14159265359"/>
 
-  <!-- ros2_control: mock interface for joint position -->
+  <xacro:wheel
+    link_name="front_right_wheel_link"
+    joint_name="front_right_joint"
+    x="${wheel_x_offset}"
+    y="${-wheel_y_offset}"
+    visual_rpy="0 0 0"/>
+
+  <xacro:wheel
+    link_name="rear_left_wheel_link"
+    joint_name="rear_left_joint"
+    x="${-wheel_x_offset}"
+    y="${wheel_y_offset}"
+    visual_rpy="0 0 3.14159265359"/>
+
+  <xacro:wheel
+    link_name="rear_right_wheel_link"
+    joint_name="rear_right_joint"
+    x="${-wheel_x_offset}"
+    y="${-wheel_y_offset}"
+    visual_rpy="0 0 0"/>
+
+  <link name="camera_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.090 0.025 0.025"/>
+      </geometry>
+      <material name="CameraBlack"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_camera" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.280 0 0.320" rpy="0 0.261799 0"/>
+  </joint>
+
+  <link name="laser">
+    <visual>
+      <origin xyz="0 0 0.015" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.030" radius="0.035"/>
+      </geometry>
+      <material name="LidarBlue"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_laser" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser"/>
+    <origin xyz="0.122 0 0.1656" rpy="0 0 0"/>
+  </joint>
+
   <ros2_control name="RuggedRoverControl" type="system">
     <hardware>
       <plugin>rugged_rover_hardware_interfaces/sabertooth/SabertoothSystemInterface</plugin>
     </hardware>
+
     <joint name="front_left_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
+
     <joint name="front_right_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
+
     <joint name="rear_left_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
+
     <joint name="rear_right_joint">
       <command_interface name="velocity"/>
       <state_interface name="position"/>

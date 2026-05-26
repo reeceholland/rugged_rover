@@ -16,6 +16,7 @@ find_package(rugged_rover_control REQUIRED)
 find_package(rugged_rover_hardware_interfaces REQUIRED)
 
 install(DIRECTORY
+  config
   launch
   DESTINATION share/${PROJECT_NAME}/
 )
