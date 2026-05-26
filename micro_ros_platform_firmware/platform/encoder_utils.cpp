@@ -15,6 +15,8 @@ Encoder frontRightEncoder(4, 5);
 
 volatile long frontLeftLastTicks = 0;
 volatile long frontRightLastTicks = 0;
+float current_front_left_position_rad = 0;
+float current_front_right_position_rad = 0;
 float current_front_left_rads_sec = 0;
 float current_front_right_rads_sec = 0;
 unsigned long lastEncoderSampleTime = 0;
@@ -40,6 +42,11 @@ void sample_encoders()
   //  Read the current encoder values
   long currentFL = frontLeftEncoder.read();
   long currentFR = frontRightEncoder.read();
+
+  current_front_left_position_rad =
+      (currentFL / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI * -1;
+  current_front_right_position_rad =
+      (currentFR / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI;
 
   //  Calculate the change in ticks since the last sample
   long deltaFL = currentFL - frontLeftLastTicks;

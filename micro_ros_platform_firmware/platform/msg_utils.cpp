@@ -11,14 +11,26 @@
 
 rosidl_runtime_c__String name_data[MAX_JOINTS];
 char name_buffer[MAX_JOINTS][MAX_NAME_LEN];
+double position_data[MAX_JOINTS];
 double velocity_data[MAX_JOINTS];
+
+namespace
+{
+
+  const char* const JOINT_NAMES[MAX_JOINTS] = {
+      "front_left_joint",
+      "front_right_joint",
+      "rear_left_joint",
+      "rear_right_joint",
+  };
+
+} // namespace
 
 /**
  * @brief Initialise the JointState message with default values.
  *
  * This function sets up the JointState message with predefined joint names and
- * initializes the velocity data. The position and effort sequences are left
- * empty.
+ * initializes the position and velocity data. The effort sequence is left empty.
  *
  * @param msg The JointState message to initialize.
  */
@@ -32,29 +44,24 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   msg.velocity.size = 4;
   msg.velocity.capacity = MAX_JOINTS;
 
-  msg.position.data = NULL;
-  msg.position.size = 0;
-  msg.position.capacity = 0;
+  msg.position.data = position_data;
+  msg.position.size = 4;
+  msg.position.capacity = MAX_JOINTS;
 
   msg.effort.data = NULL;
   msg.effort.size = 0;
   msg.effort.capacity = 0;
 
-  name_data[0].data = (char*) "front_left_joint";
-  name_data[0].size = strlen(name_data[0].data);
-  name_data[0].capacity = MAX_NAME_LEN;
-
-  name_data[1].data = (char*) "front_right_joint";
-  name_data[1].size = strlen(name_data[1].data);
-  name_data[1].capacity = MAX_NAME_LEN;
-
-  name_data[2].data = (char*) "rear_left_joint";
-  name_data[2].size = strlen(name_data[2].data);
-  name_data[2].capacity = MAX_NAME_LEN;
-
-  name_data[3].data = (char*) "rear_right_joint";
-  name_data[3].size = strlen(name_data[3].data);
-  name_data[3].capacity = MAX_NAME_LEN;
+  for (size_t i = 0; i < MAX_JOINTS; ++i)
+  {
+    strncpy(name_buffer[i], JOINT_NAMES[i], MAX_NAME_LEN - 1);
+    name_buffer[i][MAX_NAME_LEN - 1] = '\0';
+    name_data[i].data = name_buffer[i];
+    name_data[i].size = strlen(name_buffer[i]);
+    name_data[i].capacity = MAX_NAME_LEN;
+    position_data[i] = 0.0;
+    velocity_data[i] = 0.0;
+  }
 }
 
 /**
@@ -66,6 +73,11 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
  */
 void publish_joint_state_message()
 {
+  feedback_msg.position.data[0] = current_front_left_position_rad;
+  feedback_msg.position.data[1] = current_front_right_position_rad;
+  feedback_msg.position.data[2] = current_front_left_position_rad;
+  feedback_msg.position.data[3] = current_front_right_position_rad;
+
   feedback_msg.velocity.data[0] = current_front_left_rads_sec;
   feedback_msg.velocity.data[1] = current_front_right_rads_sec;
   feedback_msg.velocity.data[2] = current_front_left_rads_sec;
