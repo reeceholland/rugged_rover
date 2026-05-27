@@ -34,6 +34,12 @@ def generate_launch_description():
         'ekf.launch.py'
     ])
 
+    d435_launch = PathJoinSubstitution([
+        FindPackageShare('rugged_rover_bringup'),
+        'launch',
+        'd435.launch.py'
+    ])
+
     # Create the launch description
     return LaunchDescription([
         Node(
@@ -65,6 +71,9 @@ def generate_launch_description():
                 'imu_topic': '/imu/data',
                 'output_odom_topic': '/odom',
             }.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(d435_launch),
         ),
         # RViz2 for visualization
         # This node launches RViz2 with a predefined configuration file
