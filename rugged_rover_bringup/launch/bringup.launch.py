@@ -1,12 +1,14 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.substitutions import Command, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
-from launch.actions import TimerAction
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
+    micro_ros_device = LaunchConfiguration('micro_ros_device')
+
     # Construct the path to the URDF file using xacro
     xacro_path = PathJoinSubstitution([
         FindPackageShare('rugged_rover_robot_description'),
@@ -23,11 +25,16 @@ def generate_launch_description():
 
     # Create the launch description
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'micro_ros_device',
+            default_value='/dev/ttyAMA0',
+            description='Serial device used by the micro-ROS Agent.'
+        ),
         Node(
             package="micro_ros_agent",
             executable="micro_ros_agent",
             name="micro_ros_agent",
-            arguments=["serial", "--dev", "/dev/ttyACM0"],
+            arguments=["serial", "--dev", micro_ros_device],
             output="screen"
         ),
         Node(
