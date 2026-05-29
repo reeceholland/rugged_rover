@@ -35,14 +35,14 @@ extern "C" bool arduino_transport_close(struct uxrCustomTransport*)
 extern "C" size_t arduino_transport_write(struct uxrCustomTransport*, const uint8_t* buf,
                                           size_t len, uint8_t* err)
 {
-  (void)err;
+  (void) err;
   return Serial1.write(buf, len);
 }
 
 extern "C" size_t arduino_transport_read(struct uxrCustomTransport*, uint8_t* buf, size_t len,
                                          int timeout, uint8_t* err)
 {
-  (void)err;
+  (void) err;
   Serial1.setTimeout(timeout);
   return Serial1.readBytes(reinterpret_cast<char*>(buf), len);
 }

@@ -10,8 +10,8 @@ inline void report_micro_ros_error(const char* message, int rc = 0)
 {
   // Do not print on Serial1 here: Serial1 is the micro-ROS transport to the Pi.
   // The LED blink in error_loop() is the hardware-visible failure indicator.
-  (void)message;
-  (void)rc;
+  (void) message;
+  (void) rc;
 }
 
 // Macro helpers for micro-ROS error handling
