@@ -20,6 +20,33 @@ rcl_node_t node;
 sensor_msgs__msg__JointState cmd_msg;
 sensor_msgs__msg__JointState feedback_msg;
 
+extern "C" bool arduino_transport_open(struct uxrCustomTransport*)
+{
+  Serial1.begin(115200);
+  return true;
+}
+
+extern "C" bool arduino_transport_close(struct uxrCustomTransport*)
+{
+  Serial1.end();
+  return true;
+}
+
+extern "C" size_t arduino_transport_write(struct uxrCustomTransport*, const uint8_t* buf,
+                                          size_t len, uint8_t* err)
+{
+  (void)err;
+  return Serial1.write(buf, len);
+}
+
+extern "C" size_t arduino_transport_read(struct uxrCustomTransport*, uint8_t* buf, size_t len,
+                                         int timeout, uint8_t* err)
+{
+  (void)err;
+  Serial1.setTimeout(timeout);
+  return Serial1.readBytes(reinterpret_cast<char*>(buf), len);
+}
+
 /**
  * @brief Setup the micro-ROS environment and initialize the node.
  *
@@ -29,10 +56,14 @@ sensor_msgs__msg__JointState feedback_msg;
  */
 void ros_setup()
 {
-  //  Serial setup for the Sabertooth
+  // Serial2 is reserved for Teensy -> Sabertooth motor commands.
   Serial2.begin(9600);
 
-  // micro-ROS transport setup
+  // Serial1 is the Raspberry Pi <-> Teensy micro-ROS transport.
+  // Wire Pi TXD0 GPIO14/pin 8  -> Teensy RX1/pin 0
+  // Wire Pi RXD0 GPIO15/pin 10 -> Teensy TX1/pin 1
+  // Wire Pi GND                -> Teensy GND
+  Serial1.begin(115200);
   set_microros_transports();
 
   pinMode(LED_PIN, OUTPUT);

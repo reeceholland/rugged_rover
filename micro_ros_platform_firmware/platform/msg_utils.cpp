@@ -9,10 +9,14 @@
 #include "ros_interface.hpp"
 #include <cstring>
 
-rosidl_runtime_c__String name_data[MAX_JOINTS];
-char name_buffer[MAX_JOINTS][MAX_NAME_LEN];
-double position_data[MAX_JOINTS];
-double velocity_data[MAX_JOINTS];
+rosidl_runtime_c__String cmd_name_data[MAX_JOINTS];
+rosidl_runtime_c__String feedback_name_data[MAX_JOINTS];
+char cmd_name_buffer[MAX_JOINTS][MAX_NAME_LEN];
+char feedback_name_buffer[MAX_JOINTS][MAX_NAME_LEN];
+double cmd_position_data[MAX_JOINTS];
+double cmd_velocity_data[MAX_JOINTS];
+double feedback_position_data[MAX_JOINTS];
+double feedback_velocity_data[MAX_JOINTS];
 
 namespace
 {
@@ -36,15 +40,22 @@ namespace
  */
 void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
 {
-  msg.name.data = name_data;
+  const bool is_feedback_msg = (&msg == &feedback_msg);
+
+  rosidl_runtime_c__String* names = is_feedback_msg ? feedback_name_data : cmd_name_data;
+  char (*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
+  double* positions = is_feedback_msg ? feedback_position_data : cmd_position_data;
+  double* velocities = is_feedback_msg ? feedback_velocity_data : cmd_velocity_data;
+
+  msg.name.data = names;
   msg.name.size = 4;
   msg.name.capacity = MAX_JOINTS;
 
-  msg.velocity.data = velocity_data;
+  msg.velocity.data = velocities;
   msg.velocity.size = 4;
   msg.velocity.capacity = MAX_JOINTS;
 
-  msg.position.data = position_data;
+  msg.position.data = positions;
   msg.position.size = 4;
   msg.position.capacity = MAX_JOINTS;
 
@@ -54,13 +65,13 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
 
   for (size_t i = 0; i < MAX_JOINTS; ++i)
   {
-    strncpy(name_buffer[i], JOINT_NAMES[i], MAX_NAME_LEN - 1);
-    name_buffer[i][MAX_NAME_LEN - 1] = '\0';
-    name_data[i].data = name_buffer[i];
-    name_data[i].size = strlen(name_buffer[i]);
-    name_data[i].capacity = MAX_NAME_LEN;
-    position_data[i] = 0.0;
-    velocity_data[i] = 0.0;
+    strncpy(name_storage[i], JOINT_NAMES[i], MAX_NAME_LEN - 1);
+    name_storage[i][MAX_NAME_LEN - 1] = '\0';
+    names[i].data = name_storage[i];
+    names[i].size = strlen(name_storage[i]);
+    names[i].capacity = MAX_NAME_LEN;
+    positions[i] = 0.0;
+    velocities[i] = 0.0;
   }
 }
 
@@ -104,6 +115,11 @@ void subscription_callback(const void* msgin)
   //  velocity setpoint
   for (size_t i = 0; i < joint_msg->name.size && i < MAX_JOINTS; i++)
   {
+    if (i >= joint_msg->velocity.size)
+    {
+      break;
+    }
+
     const char* name = joint_msg->name.data[i].data;
     float velocity = joint_msg->velocity.data[i];
     if (strcmp(name, "front_left_joint") == 0)
