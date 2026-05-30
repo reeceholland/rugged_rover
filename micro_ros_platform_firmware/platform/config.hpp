@@ -6,7 +6,7 @@
 
 extern bool SERIAL_DEBUG;
 
-#define BATTERY_VOLTAGE_PIN A0
+#define BATTERY_VOLTAGE_PIN A9
 
 constexpr float BATTERY_R_TOP = 100000.0f;
 constexpr float BATTERY_R_BOTTOM = 33000.0f;
