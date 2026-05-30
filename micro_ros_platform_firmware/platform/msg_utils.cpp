@@ -1,4 +1,5 @@
 #include "msg_utils.hpp"
+#include "battery_monitor.hpp"
 #include "config.hpp"
 
 #if USE_ROS
@@ -7,6 +8,7 @@
 #include "motor_control.hpp"
 #include "msg_utils.hpp"
 #include "ros_interface.hpp"
+#include <Arduino.h>
 #include <cstring>
 
 rosidl_runtime_c__String cmd_name_data[MAX_JOINTS];
@@ -75,6 +77,27 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   }
 }
 
+void initialise_battery_voltage_message(std_msgs__msg__Float32& msg)
+{
+  msg.data = 0.0f;
+}
+
+void publish_battery_voltage_message()
+{
+  static unsigned long last_publish_ms = 0;
+  unsigned long now = millis();
+
+  if (now - last_publish_ms < BATTERY_PUBLISH_PERIOD_MS)
+  {
+    return;
+  }
+
+  last_publish_ms = now;
+
+  battery_voltage_msg.data = read_battery_voltage();
+  RCSOFTCHECK(rcl_publish(&battery_voltage_publisher, &battery_voltage_msg, NULL));
+}
+
 /**
  * @brief Publish the JointState message with current velocity data.
  *
@@ -139,4 +162,5 @@ void subscription_callback(const void* msgin)
 }
 #else
 void publish_joint_state_message() {}
+void publish_battery_voltage_message() {}
 #endif
