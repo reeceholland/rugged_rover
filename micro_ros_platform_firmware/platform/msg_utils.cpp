@@ -1,4 +1,5 @@
 #include "msg_utils.hpp"
+#include "battery_monitor.hpp"
 #include "config.hpp"
 
 #if USE_ROS
@@ -7,54 +8,94 @@
 #include "motor_control.hpp"
 #include "msg_utils.hpp"
 #include "ros_interface.hpp"
+#include <Arduino.h>
 #include <cstring>
 
-rosidl_runtime_c__String name_data[MAX_JOINTS];
-char name_buffer[MAX_JOINTS][MAX_NAME_LEN];
-double velocity_data[MAX_JOINTS];
+rosidl_runtime_c__String cmd_name_data[MAX_JOINTS];
+rosidl_runtime_c__String feedback_name_data[MAX_JOINTS];
+char cmd_name_buffer[MAX_JOINTS][MAX_NAME_LEN];
+char feedback_name_buffer[MAX_JOINTS][MAX_NAME_LEN];
+double cmd_position_data[MAX_JOINTS];
+double cmd_velocity_data[MAX_JOINTS];
+double feedback_position_data[MAX_JOINTS];
+double feedback_velocity_data[MAX_JOINTS];
+
+namespace
+{
+
+  const char* const JOINT_NAMES[MAX_JOINTS] = {
+      "front_left_joint",
+      "front_right_joint",
+      "rear_left_joint",
+      "rear_right_joint",
+  };
+
+} // namespace
 
 /**
  * @brief Initialise the JointState message with default values.
  *
  * This function sets up the JointState message with predefined joint names and
- * initializes the velocity data. The position and effort sequences are left
- * empty.
+ * initializes the position and velocity data. The effort sequence is left empty.
  *
  * @param msg The JointState message to initialize.
  */
 void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
 {
-  msg.name.data = name_data;
+  const bool is_feedback_msg = (&msg == &feedback_msg);
+
+  rosidl_runtime_c__String* names = is_feedback_msg ? feedback_name_data : cmd_name_data;
+  char(*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
+  double* positions = is_feedback_msg ? feedback_position_data : cmd_position_data;
+  double* velocities = is_feedback_msg ? feedback_velocity_data : cmd_velocity_data;
+
+  msg.name.data = names;
   msg.name.size = 4;
   msg.name.capacity = MAX_JOINTS;
 
-  msg.velocity.data = velocity_data;
+  msg.velocity.data = velocities;
   msg.velocity.size = 4;
   msg.velocity.capacity = MAX_JOINTS;
 
-  msg.position.data = NULL;
-  msg.position.size = 0;
-  msg.position.capacity = 0;
+  msg.position.data = positions;
+  msg.position.size = 4;
+  msg.position.capacity = MAX_JOINTS;
 
   msg.effort.data = NULL;
   msg.effort.size = 0;
   msg.effort.capacity = 0;
 
-  name_data[0].data = (char*) "front_left_joint";
-  name_data[0].size = strlen(name_data[0].data);
-  name_data[0].capacity = MAX_NAME_LEN;
+  for (size_t i = 0; i < MAX_JOINTS; ++i)
+  {
+    strncpy(name_storage[i], JOINT_NAMES[i], MAX_NAME_LEN - 1);
+    name_storage[i][MAX_NAME_LEN - 1] = '\0';
+    names[i].data = name_storage[i];
+    names[i].size = strlen(name_storage[i]);
+    names[i].capacity = MAX_NAME_LEN;
+    positions[i] = 0.0;
+    velocities[i] = 0.0;
+  }
+}
 
-  name_data[1].data = (char*) "front_right_joint";
-  name_data[1].size = strlen(name_data[1].data);
-  name_data[1].capacity = MAX_NAME_LEN;
+void initialise_battery_voltage_message(std_msgs__msg__Float32& msg)
+{
+  msg.data = 0.0f;
+}
 
-  name_data[2].data = (char*) "rear_left_joint";
-  name_data[2].size = strlen(name_data[2].data);
-  name_data[2].capacity = MAX_NAME_LEN;
+void publish_battery_voltage_message()
+{
+  static unsigned long last_publish_ms = 0;
+  unsigned long now = millis();
 
-  name_data[3].data = (char*) "rear_right_joint";
-  name_data[3].size = strlen(name_data[3].data);
-  name_data[3].capacity = MAX_NAME_LEN;
+  if (now - last_publish_ms < BATTERY_PUBLISH_PERIOD_MS)
+  {
+    return;
+  }
+
+  last_publish_ms = now;
+
+  battery_voltage_msg.data = read_battery_voltage();
+  RCSOFTCHECK(rcl_publish(&battery_voltage_publisher, &battery_voltage_msg, NULL));
 }
 
 /**
@@ -66,6 +107,11 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
  */
 void publish_joint_state_message()
 {
+  feedback_msg.position.data[0] = current_front_left_position_rad;
+  feedback_msg.position.data[1] = current_front_right_position_rad;
+  feedback_msg.position.data[2] = current_front_left_position_rad;
+  feedback_msg.position.data[3] = current_front_right_position_rad;
+
   feedback_msg.velocity.data[0] = current_front_left_rads_sec;
   feedback_msg.velocity.data[1] = current_front_right_rads_sec;
   feedback_msg.velocity.data[2] = current_front_left_rads_sec;
@@ -92,6 +138,11 @@ void subscription_callback(const void* msgin)
   //  velocity setpoint
   for (size_t i = 0; i < joint_msg->name.size && i < MAX_JOINTS; i++)
   {
+    if (i >= joint_msg->velocity.size)
+    {
+      break;
+    }
+
     const char* name = joint_msg->name.data[i].data;
     float velocity = joint_msg->velocity.data[i];
     if (strcmp(name, "front_left_joint") == 0)
@@ -111,4 +162,5 @@ void subscription_callback(const void* msgin)
 }
 #else
 void publish_joint_state_message() {}
+void publish_battery_voltage_message() {}
 #endif
