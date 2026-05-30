@@ -1,4 +1,4 @@
-﻿<?xml version="1.0"?>
+<?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="rugged_rover">
 
   <!-- Dimensions are in meters. ROS convention: X forward, Y left, Z up. -->
@@ -169,6 +169,14 @@
     <parent link="base_link"/>
     <child link="laser"/>
     <origin xyz="0.122 0 0.1656" rpy="0 0 0"/>
+  </joint>
+
+  <link name="imu_link"/>
+
+  <joint name="base_to_imu" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0.015 0.070 0.010" rpy="3.14159265359 0 1.57079632679"/>
   </joint>
 
   <ros2_control name="RuggedRoverControl" type="system">

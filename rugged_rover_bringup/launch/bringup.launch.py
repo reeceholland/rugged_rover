@@ -1,100 +1,125 @@
 from launch import LaunchDescription
-from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
-from launch_ros.substitutions import FindPackageShare
-from launch.actions import DeclareLaunchArgument, TimerAction
+from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    micro_ros_device = LaunchConfiguration('micro_ros_device')
+    micro_ros_device = LaunchConfiguration("micro_ros_device")
 
-    # Construct the path to the URDF file using xacro
     xacro_path = PathJoinSubstitution([
-        FindPackageShare('rugged_rover_robot_description'),
-        'urdf',
-        'rugged_rover.urdf.xacro'
+        FindPackageShare("rugged_rover_robot_description"),
+        "urdf",
+        "rugged_rover.urdf.xacro",
     ])
 
-    # Construct the path to the controller configuration file
     controller_config = PathJoinSubstitution([
-        FindPackageShare('rugged_rover_robot_description'),
-        'config',
-        'controller_config.yaml'
+        FindPackageShare("rugged_rover_control"),
+        "config",
+        "controllers.yaml",
     ])
 
-    # Create the launch description
+    imu_launch = PathJoinSubstitution([
+        FindPackageShare("razor_imu"),
+        "launch",
+        "razor.launch.py",
+    ])
+
+    ekf_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "ekf.launch.py",
+    ])
+
+    d435_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "d435.launch.py",
+    ])
+
+    robot_description = {
+        "robot_description": ParameterValue(
+            Command(["xacro ", xacro_path]),
+            value_type=str,
+        )
+    }
+
     return LaunchDescription([
         DeclareLaunchArgument(
-            'micro_ros_device',
-            default_value='/dev/ttyAMA0',
-            description='Serial device used by the micro-ROS Agent.'
+            "micro_ros_device",
+            default_value="/dev/ttyAMA0",
+            description="Serial device used by the micro-ROS Agent.",
         ),
+
         Node(
             package="micro_ros_agent",
             executable="micro_ros_agent",
             name="micro_ros_agent",
             arguments=["serial", "--dev", micro_ros_device],
-            output="screen"
-        ),
-        Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            output='screen',
-            parameters=[{
-                'robot_description': ParameterValue(
-                    Command(['xacro ', xacro_path]),
-                    value_type=str
-                )
-            }]
-        ),
-        # RViz2 for visualization
-        # This node launches RViz2 with a predefined configuration file
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', PathJoinSubstitution([
-                FindPackageShare('rugged_rover_robot_description'),
-                'rviz',
-                'view.rviz'
-            ])],
-            output='screen'
+            output="screen",
         ),
 
-        # ROS 2 Control Node
-        # This node initializes the ROS 2 control framework with the robot description and controller configuration
         Node(
-            package='controller_manager',
-            executable='ros2_control_node',
+            package="robot_state_publisher",
+            executable="robot_state_publisher",
+            output="screen",
+            parameters=[robot_description],
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(imu_launch),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(ekf_launch),
+            launch_arguments={
+                "use_sim_time": "false",
+                "odom_topic": "/diff_drive_controller/odom",
+                "imu_topic": "/imu/data",
+                "output_odom_topic": "/odom",
+            }.items(),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(d435_launch),
+        ),
+
+        Node(
+            package="controller_manager",
+            executable="ros2_control_node",
             parameters=[
-                {'robot_description': ParameterValue(
-                    Command(['xacro ', xacro_path]),
-                    value_type=str
-                )},
-                controller_config
+                robot_description,
+                controller_config,
             ],
-            output='screen'
+            output="screen",
         ),
 
-        # Timer action to spawn controllers after a delay
-        # This action waits for 4 seconds before spawning the joint state broadcaster and diff drive controller
         TimerAction(
-            period=1.0,
+            period=4.0,
             actions=[
                 Node(
-                    package='controller_manager',
-                    executable='spawner',
-                    arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
-                    output="screen"
+                    package="controller_manager",
+                    executable="spawner",
+                    arguments=[
+                        "joint_state_broadcaster",
+                        "--controller-manager",
+                        "/controller_manager",
+                    ],
+                    output="screen",
                 ),
                 Node(
-                    package='controller_manager',
-                    executable='spawner',
-                    arguments=["diff_drive_controller", "--controller-manager", "/controller_manager"],
-                    output="screen"
-                )
-            ]
-        )
+                    package="controller_manager",
+                    executable="spawner",
+                    arguments=[
+                        "diff_drive_controller",
+                        "--controller-manager",
+                        "/controller_manager",
+                    ],
+                    output="screen",
+                ),
+            ],
+        ),
     ])
-
