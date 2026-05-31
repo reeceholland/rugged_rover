@@ -4,6 +4,7 @@
 #define RUGGED_ROVER_HARDWARE_INTERFACES_SABERTOOTH_SYSTEM_INTERFACE_HPP
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -62,6 +63,9 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     rclcpp::Logger logger_ = rclcpp::get_logger("SabertoothSystemInterface");
 
     sensor_msgs::msg::JointState last_feedback_;
+    rclcpp::Time last_feedback_time_;
+    bool has_feedback_ = false;
+    double feedback_timeout_seconds_ = 0.25;
     std::mutex feedback_mutex_;
 
     friend class SabertoothInterfaceTest;

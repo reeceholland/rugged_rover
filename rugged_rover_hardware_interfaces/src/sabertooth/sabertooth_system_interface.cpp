@@ -1,5 +1,6 @@
 #include "rugged_rover_hardware_interfaces/sabertooth/sabertooth_system_interface.hpp"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -174,6 +175,18 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     std::lock_guard<std::mutex> lock(feedback_mutex_);
 
+    // If Unity or the Teensy stops publishing feedback, do not keep replaying
+    // the last non-zero velocity forever. Keep the last positions, but report
+    // zero wheel velocity so odometry stops advancing in RViz.
+    const bool feedback_is_stale =
+        !has_feedback_ || !node_ ||
+        (node_->now() - last_feedback_time_).seconds() > feedback_timeout_seconds_;
+    if (feedback_is_stale)
+    {
+      std::fill(hw_velocities_.begin(), hw_velocities_.end(), 0.0);
+      return hardware_interface::return_type::OK;
+    }
+
     // Update positions and velocities from the most recent feedback
     for (size_t i = 0; i < joint_names_.size(); ++i)
     {
@@ -253,6 +266,8 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     // Update the last_feedback_ member variable with the received message
     last_feedback_ = *msg;
+    last_feedback_time_ = node_->now();
+    has_feedback_ = true;
   }
 
 } // namespace rugged_rover_hardware_interfaces::sabertooth

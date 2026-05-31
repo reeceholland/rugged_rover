@@ -67,11 +67,16 @@ def generate_launch_description():
 
                 # Unity is the upstream motor feedback producer. Route it through
                 # fault injection before ros2_control consumes it.
-                ("/platform/motors/feedback", "/platform/motors/feedback_raw"),
+                # ("/platform/motors/feedback", "/platform/motors/feedback_raw"),
             ],
             output="screen",
         ),
-
+        Node(
+            package="rugged_rover_battery",
+            executable="battery_voltage_monitor",
+            name="battery_voltage_monitor",
+            output="screen",
+        ),
         Node(
             package="robot_state_publisher",
             executable="robot_state_publisher",
@@ -79,7 +84,6 @@ def generate_launch_description():
             parameters=[robot_description, {"use_sim_time": True}],
             output="screen",
         ),
-
         Node(
             package="controller_manager",
             executable="ros2_control_node",
@@ -90,9 +94,8 @@ def generate_launch_description():
                 {"use_sim_time": True},
             ],
             remappings=[
-                # diff_drive_controller publishes wheel-derived odometry under the
-                # controller namespace. Fault injection consumes /odom_raw and
-                # republishes the possibly faulted stream on /odom for Nav2/SLAM.
+                # Feed wheel-derived odometry into EKF. EKF republishes the
+                # fused odometry on /odom and owns odom -> base_link.
                 ("/diff_drive_controller/odom", "/odom_raw"),
             ],
             output="screen",
@@ -118,10 +121,19 @@ def generate_launch_description():
                         "joint_state_broadcaster",
                         "--controller-manager",
                         "/controller_manager",
-                        "--activate",
+                        "--controller-manager-timeout",
+                        "20",
+                        "--switch-timeout",
+                        "20",
                     ],
                     output="screen",
                 ),
+            ],
+        ),
+
+        TimerAction(
+            period=6.0,
+            actions=[
                 Node(
                     package="controller_manager",
                     executable="spawner",
@@ -129,7 +141,10 @@ def generate_launch_description():
                         "diff_drive_controller",
                         "--controller-manager",
                         "/controller_manager",
-                        "--activate",
+                        "--controller-manager-timeout",
+                        "20",
+                        "--switch-timeout",
+                        "20",
                     ],
                     output="screen",
                 ),

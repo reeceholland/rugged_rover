@@ -42,7 +42,9 @@ def generate_launch_description():
                         "-lc",
                         "until ros2 service list | grep -q '^/slam_toolbox/change_state$'; "
                         "do sleep 0.2; done; "
-                        "ros2 lifecycle set /slam_toolbox configure",
+                        "ros2 service call /slam_toolbox/change_state "
+                        "lifecycle_msgs/srv/ChangeState "
+                        "'{transition: {id: 1}}'",
                     ],
                     output="screen",
                 ),
@@ -56,9 +58,13 @@ def generate_launch_description():
                     cmd=[
                         "bash",
                         "-lc",
-                        "until ros2 lifecycle get /slam_toolbox 2>/dev/null | grep -q 'inactive'; "
+                        "until ros2 service call /slam_toolbox/get_state "
+                        "lifecycle_msgs/srv/GetState "
+                        "'{}' 2>/dev/null | grep -Eq 'id=2|id: 2'; "
                         "do sleep 0.2; done; "
-                        "ros2 lifecycle set /slam_toolbox activate",
+                        "ros2 service call /slam_toolbox/change_state "
+                        "lifecycle_msgs/srv/ChangeState "
+                        "'{transition: {id: 3}}'",
                     ],
                     output="screen",
                 ),

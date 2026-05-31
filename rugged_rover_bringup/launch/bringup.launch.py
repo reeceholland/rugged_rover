@@ -63,6 +63,13 @@ def generate_launch_description():
         ),
 
         Node(
+            package="rugged_rover_battery",
+            executable="battery_voltage_monitor",
+            name="battery_voltage_monitor",
+            output="screen",
+        ),
+
+        Node(
             package="robot_state_publisher",
             executable="robot_state_publisher",
             output="screen",
