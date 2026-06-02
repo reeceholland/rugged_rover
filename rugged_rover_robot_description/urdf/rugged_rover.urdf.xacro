@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro" name="rugged_rover">
+  <xacro:arg name="command_qos" default="best_effort"/>
 
   <!-- Dimensions are in meters. ROS convention: X forward, Y left, Z up. -->
   <xacro:property name="chassis_length" value="0.320"/>
@@ -182,6 +183,7 @@
   <ros2_control name="RuggedRoverControl" type="system">
     <hardware>
       <plugin>rugged_rover_hardware_interfaces/sabertooth/SabertoothSystemInterface</plugin>
+      <param name="command_qos">$(arg command_qos)</param>
     </hardware>
 
     <joint name="front_left_joint">

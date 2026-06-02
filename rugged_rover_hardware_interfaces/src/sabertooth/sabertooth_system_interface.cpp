@@ -40,6 +40,12 @@ namespace rugged_rover_hardware_interfaces::sabertooth
       joint_names_.push_back(joint.name);
     }
 
+    const auto command_qos = info.hardware_parameters.find("command_qos");
+    if (command_qos != info.hardware_parameters.end())
+    {
+      use_reliable_command_qos_ = command_qos->second == "reliable";
+    }
+
     // Resize the hardware state and command vectors to match the number of joints
     hw_positions_.resize(joint_names_.size(), 0.0);
     hw_velocities_.resize(joint_names_.size(), 0.0);
@@ -73,9 +79,31 @@ namespace rugged_rover_hardware_interfaces::sabertooth
         "platform/motors/feedback", rclcpp::SensorDataQoS(),
         std::bind(&SabertoothSystemInterface::feedbackCallback, this, std::placeholders::_1));
 
-    // Create a publisher for the command topic
+    battery_critical_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
+        "platform/battery/is_critical", rclcpp::SensorDataQoS(),
+        [this](const std_msgs::msg::Bool::SharedPtr msg)
+        { battery_allows_motion_.store(!msg->data); });
+
+    // Motor commands should be "latest value wins". The real rover uses
+    // best-effort so old velocity commands are dropped instead of replayed late.
+    // Unity's ROS TCP endpoint subscribes reliably, so simulation opts into
+    // reliable QoS through the command_qos hardware parameter.
+    auto command_qos = rclcpp::QoS(rclcpp::KeepLast(1));
+    if (use_reliable_command_qos_)
+    {
+      command_qos.reliable();
+    }
+    else
+    {
+      command_qos.best_effort();
+    }
+
+    RCLCPP_INFO(this->logger_, "Using %s QoS for platform motor commands",
+                use_reliable_command_qos_ ? "reliable" : "best_effort");
+
     cmd_pub_ = node_->create_publisher<sensor_msgs::msg::JointState>("platform/motors/cmd",
-                                                                     rclcpp::QoS(10).reliable());
+                                                                     command_qos);
+    last_command_publish_time_ = node_->now();
 
     // Return success if activation is complete
     return hardware_interface::CallbackReturn::SUCCESS;
@@ -99,6 +127,7 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     // Reset the node, subscription, and publisher to clean up resources
     feedback_sub_.reset();
+    battery_critical_sub_.reset();
     cmd_pub_.reset();
     node_.reset();
 
@@ -231,15 +260,30 @@ namespace rugged_rover_hardware_interfaces::sabertooth
       RCLCPP_ERROR(this->logger_, "Command publisher or node is not initialized.");
       return hardware_interface::return_type::ERROR;
     }
+    const rclcpp::Time now = node_->now();
+    if ((now - last_command_publish_time_).seconds() < command_publish_period_seconds_)
+    {
+      return hardware_interface::return_type::OK;
+    }
+    last_command_publish_time_ = now;
+
     // Create a JointState message to publish the commands
     sensor_msgs::msg::JointState cmd_msg;
 
     // Set the header for the command message
-    cmd_msg.header.stamp = node_->now();
+    cmd_msg.header.stamp = now;
 
     // Set the joint names and commands in the command message
     cmd_msg.name = joint_names_;
-    cmd_msg.velocity = hw_commands_;
+
+    if (!battery_allows_motion_.load())
+    {
+      cmd_msg.velocity.assign(joint_names_.size(), 0.0);
+    }
+    else
+    {
+      cmd_msg.velocity = hw_commands_;
+    }
 
     // Publish the command message to the topic
 

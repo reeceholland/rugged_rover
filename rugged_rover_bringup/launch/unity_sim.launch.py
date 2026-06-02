@@ -30,7 +30,7 @@ def generate_launch_description():
 
     robot_description = {
         "robot_description": ParameterValue(
-            Command(["xacro ", xacro_path]),
+            Command(["xacro ", xacro_path, " command_qos:=reliable"]),
             value_type=str,
         )
     }

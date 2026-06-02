@@ -12,6 +12,7 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 namespace rugged_rover_hardware_interfaces::sabertooth
 {
@@ -51,6 +52,8 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr feedback_sub_;
 
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr battery_critical_sub_;
+
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr cmd_pub_;
 
     void feedbackCallback(const sensor_msgs::msg::JointState::SharedPtr msg);
@@ -66,7 +69,11 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     rclcpp::Time last_feedback_time_;
     bool has_feedback_ = false;
     double feedback_timeout_seconds_ = 0.25;
+    bool use_reliable_command_qos_ = false;
+    rclcpp::Time last_command_publish_time_;
+    double command_publish_period_seconds_ = 0.05;
     std::mutex feedback_mutex_;
+    std::atomic<bool> battery_allows_motion_ = true;
 
     friend class SabertoothInterfaceTest;
   };

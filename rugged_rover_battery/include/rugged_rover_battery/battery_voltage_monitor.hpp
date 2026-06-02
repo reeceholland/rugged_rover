@@ -21,6 +21,7 @@ namespace rugged_rover_battery
     void timerCallback();
 
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr battery_voltage_sub_;
+    rclcpp::TimerBase::SharedPtr stale_timer_;
 
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr battery_low_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr battery_critical_pub_;
@@ -28,7 +29,7 @@ namespace rugged_rover_battery
 
     double low_voltage_;
     double critical_voltage_;
-    double stale_timout_;
+    double stale_timeout_;
 
     rclcpp::Time last_voltage_time_;
     bool has_voltage_;

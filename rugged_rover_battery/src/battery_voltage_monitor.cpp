@@ -12,22 +12,23 @@ namespace rugged_rover_battery
     // Get parameter values
     this->get_parameter("low_voltage_threshold", low_voltage_);
     this->get_parameter("critical_voltage_threshold", critical_voltage_);
-    this->get_parameter("stale_timeout", stale_timout_);
+    this->get_parameter("stale_timeout", stale_timeout_);
 
     // Initialize publishers
     battery_low_pub_ = this->create_publisher<std_msgs::msg::Bool>("battery_low", 10);
-    battery_critical_pub_ = this->create_publisher<std_msgs::msg::Bool>("battery_critical", 10);
+    battery_critical_pub_ =
+        this->create_publisher<std_msgs::msg::Bool>("platform/battery/is_critical", 10);
     diagnostics_pub_ =
         this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("diagnostics", 10);
 
     auto timer_period = std::chrono::milliseconds(500);
 
-    auto timer = this->create_wall_timer(timer_period,
-                                         std::bind(&BatteryVoltageMonitor::timerCallback, this));
+    stale_timer_ = this->create_wall_timer(
+        timer_period, std::bind(&BatteryVoltageMonitor::timerCallback, this));
 
-    // Initialize subscriber
+    // Initialize subscriber. Teensy firmware and Unity publish the raw voltage here.
     battery_voltage_sub_ = this->create_subscription<std_msgs::msg::Float32>(
-        "battery_voltage", 10,
+        "battery/voltage", 10,
         std::bind(&BatteryVoltageMonitor::batteryVoltageCallback, this, std::placeholders::_1));
 
     has_voltage_ = false;
@@ -97,7 +98,7 @@ namespace rugged_rover_battery
     }
 
     auto now = this->now();
-    if ((now - last_voltage_time_).seconds() > stale_timout_)
+    if ((now - last_voltage_time_).seconds() > stale_timeout_)
     {
       RCLCPP_WARN(this->get_logger(), "Battery voltage data is stale!");
       publishDiagnostics(0.0, true, true); // Publish critical status for stale data
