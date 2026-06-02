@@ -1,4 +1,5 @@
 #include "motor_control.hpp"
+#include "battery_safety.hpp"
 #include "config.hpp"
 
 namespace
@@ -104,6 +105,11 @@ void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int
  */
 void update_motors()
 {
+  if (battery_is_critical())
+  {
+    stop_motors();
+    return;
+  }
   if (abs(front_left_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S &&
       abs(front_right_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S)
   {

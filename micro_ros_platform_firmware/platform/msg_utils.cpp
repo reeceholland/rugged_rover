@@ -1,5 +1,6 @@
 #include "msg_utils.hpp"
 #include "battery_monitor.hpp"
+#include "battery_safety.hpp"
 #include "config.hpp"
 
 #if USE_ROS
@@ -45,7 +46,7 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   const bool is_feedback_msg = (&msg == &feedback_msg);
 
   rosidl_runtime_c__String* names = is_feedback_msg ? feedback_name_data : cmd_name_data;
-  char(*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
+  char (*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
   double* positions = is_feedback_msg ? feedback_position_data : cmd_position_data;
   double* velocities = is_feedback_msg ? feedback_velocity_data : cmd_velocity_data;
 
@@ -131,6 +132,11 @@ void publish_joint_state_message()
  */
 void subscription_callback(const void* msgin)
 {
+  if (battery_is_critical())
+  {
+    stop_motors();
+    return;
+  }
   //  Cast the incoming message to the expected type
   const sensor_msgs__msg__JointState* joint_msg = (const sensor_msgs__msg__JointState*) msgin;
 

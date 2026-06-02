@@ -12,7 +12,9 @@
 #endif
 
 void ros_setup();
+void ros_update();
 void spin_ros_executor();
+bool ros_is_connected();
 
 #if USE_ROS
 // External ROS-related objects used across modules

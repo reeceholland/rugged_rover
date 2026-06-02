@@ -1,9 +1,11 @@
 #include "battery_monitor.hpp"
+#include "battery_safety.hpp"
 #include "config.hpp"
 #include "encoder_utils.hpp"
 #include "motor_control.hpp"
 #include "msg_utils.hpp"
 #include "ros_interface.hpp"
+#include "status_led.hpp"
 #include <Arduino.h>
 
 bool SERIAL_DEBUG = !USE_ROS;
@@ -116,6 +118,8 @@ void setup()
 
   setup_pid();
   setup_battery_monitor();
+  battery_safety_setup();
+  status_led_setup();
 }
 
 void loop()
@@ -126,7 +130,7 @@ void loop()
   {
 
     sample_encoders();
-    if (USE_ROS)
+    if (USE_ROS && ros_is_connected())
     {
       publish_joint_state_message();
       publish_battery_voltage_message();
@@ -136,10 +140,25 @@ void loop()
 
   if (USE_ROS)
   {
-    spin_ros_executor();
+    ros_update();
   }
   else
   {
     read_serial_commands();
+  }
+
+  battery_safety_update(read_battery_voltage());
+
+  if (battery_is_critical())
+  {
+    status_led_update(LedStatus::BatteryCritical);
+  }
+  else if (ros_is_connected())
+  {
+    status_led_update(LedStatus::RosConnected);
+  }
+  else
+  {
+    status_led_update(LedStatus::Normal);
   }
 }
