@@ -9,17 +9,15 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <build_depend>pluginlib</build_depend>
-
-  <build_export_depend>pluginlib</build_export_depend>
-
-  <exec_depend>pluginlib</exec_depend>
-  <exec_depend>hardware_interface</exec_depend>
+  <depend>rclcpp</depend>
+  <depend>hardware_interface</depend>
+  <depend>controller_interface</depend>
+  <depend>pluginlib</depend>
+  <depend>rugged_rover_interfaces</depend>
   
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
-  <depend>rugged_rover_interfaces</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
