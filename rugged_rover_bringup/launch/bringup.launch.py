@@ -14,6 +14,7 @@ def generate_launch_description():
     rplidar_serial_port = LaunchConfiguration("rplidar_serial_port")
     rplidar_serial_baudrate = LaunchConfiguration("rplidar_serial_baudrate")
     use_slam = LaunchConfiguration("use_slam")
+    ekf_output_odom_topic = LaunchConfiguration("ekf_output_odom_topic")
 
     xacro_path = PathJoinSubstitution([
         FindPackageShare("rugged_rover_robot_description"),
@@ -90,6 +91,14 @@ def generate_launch_description():
             default_value="true",
             description="Launch slam_toolbox for live mapping.",
         ),
+        DeclareLaunchArgument(
+            "ekf_output_odom_topic",
+            default_value="/odom",
+            description=(
+                "Filtered EKF odometry topic. Set to /odom_raw when "
+                "ros2_fault_injection should publish the final /odom topic."
+            ),
+        ),
 
         Node(
             package="micro_ros_agent",
@@ -123,7 +132,7 @@ def generate_launch_description():
                 "use_sim_time": "false",
                 "odom_topic": "/diff_drive_controller/odom",
                 "imu_topic": "/imu/data",
-                "output_odom_topic": "/odom",
+                "output_odom_topic": ekf_output_odom_topic,
             }.items(),
         ),
 

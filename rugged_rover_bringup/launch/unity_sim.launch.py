@@ -1,7 +1,7 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
@@ -9,6 +9,10 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     description_pkg = FindPackageShare("rugged_rover_robot_description")
+    wheel_odom_topic = LaunchConfiguration("wheel_odom_topic")
+    ekf_output_odom_topic = LaunchConfiguration("ekf_output_odom_topic")
+    ros_tcp_ip = LaunchConfiguration("ros_tcp_ip")
+    ros_tcp_port = LaunchConfiguration("ros_tcp_port")
 
     xacro_path = PathJoinSubstitution([
         description_pkg,
@@ -50,13 +54,41 @@ def generate_launch_description():
     }
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "wheel_odom_topic",
+            default_value="/odom_raw",
+            description=(
+                "Wheel odometry topic produced by diff_drive_controller and "
+                "consumed by the EKF. Use /wheel/odom_raw when the EKF output "
+                "is remapped to /odom_raw for fault injection."
+            ),
+        ),
+        DeclareLaunchArgument(
+            "ekf_output_odom_topic",
+            default_value="/odom",
+            description=(
+                "Filtered EKF odometry topic. Set to /odom_raw when "
+                "ros2_fault_injection should publish the final /odom topic."
+            ),
+        ),
+        DeclareLaunchArgument(
+            "ros_tcp_ip",
+            default_value="0.0.0.0",
+            description="Address for ros_tcp_endpoint to bind to. Use 0.0.0.0 for remote Unity clients.",
+        ),
+        DeclareLaunchArgument(
+            "ros_tcp_port",
+            default_value="10000",
+            description="Port for ros_tcp_endpoint.",
+        ),
+
         Node(
             package="ros_tcp_endpoint",
             executable="default_server_endpoint",
             name="ros_tcp_endpoint",
             parameters=[{
-                "ROS_IP": "127.0.0.1",
-                "ROS_TCP_PORT": 10000,
+                "ROS_IP": ros_tcp_ip,
+                "ROS_TCP_PORT": ParameterValue(ros_tcp_port, value_type=int),
             }],
             remappings=[
                 # Keep Unity's pose estimate available for comparison, but do not let
@@ -96,7 +128,7 @@ def generate_launch_description():
             remappings=[
                 # Feed wheel-derived odometry into EKF. EKF republishes the
                 # fused odometry on /odom and owns odom -> base_link.
-                ("/diff_drive_controller/odom", "/odom_raw"),
+                ("/diff_drive_controller/odom", wheel_odom_topic),
             ],
             output="screen",
         ),
@@ -105,9 +137,9 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(ekf_launch),
             launch_arguments={
                 "use_sim_time": "true",
-                "odom_topic": "/odom_raw",
+                "odom_topic": wheel_odom_topic,
                 "imu_topic": "/imu/data",
-                "output_odom_topic": "/odom",
+                "output_odom_topic": ekf_output_odom_topic,
             }.items(),
         ),
 
