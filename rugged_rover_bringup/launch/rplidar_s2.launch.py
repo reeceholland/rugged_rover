@@ -2,6 +2,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -40,7 +41,7 @@ def generate_launch_description():
             parameters=[{
                 "channel_type": "serial",
                 "serial_port": serial_port,
-                "serial_baudrate": serial_baudrate,
+                "serial_baudrate": ParameterValue(serial_baudrate, value_type=int),
                 "frame_id": frame_id,
                 "inverted": False,
                 "angle_compensate": True,
