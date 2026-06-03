@@ -45,7 +45,7 @@ def generate_launch_description():
                 "frame_id": frame_id,
                 "inverted": False,
                 "angle_compensate": True,
-                "scan_mode": "DenseBoost",
+                "scan_mode": "",
             }],
             remappings=[
                 ("scan", scan_topic),
