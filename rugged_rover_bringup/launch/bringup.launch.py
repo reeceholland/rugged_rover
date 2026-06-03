@@ -13,6 +13,7 @@ def generate_launch_description():
     use_rplidar = LaunchConfiguration("use_rplidar")
     rplidar_serial_port = LaunchConfiguration("rplidar_serial_port")
     rplidar_serial_baudrate = LaunchConfiguration("rplidar_serial_baudrate")
+    use_slam = LaunchConfiguration("use_slam")
 
     xacro_path = PathJoinSubstitution([
         FindPackageShare("rugged_rover_robot_description"),
@@ -50,6 +51,12 @@ def generate_launch_description():
         "rplidar_s2.launch.py",
     ])
 
+    slam_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "slam.launch.py",
+    ])
+
     robot_description = {
         "robot_description": ParameterValue(
             Command(["xacro ", xacro_path]),
@@ -77,6 +84,11 @@ def generate_launch_description():
             "rplidar_serial_baudrate",
             default_value="1000000",
             description="Serial baudrate used by the RPLIDAR S2.",
+        ),
+        DeclareLaunchArgument(
+            "use_slam",
+            default_value="true",
+            description="Launch slam_toolbox for live mapping.",
         ),
 
         Node(
@@ -127,6 +139,14 @@ def generate_launch_description():
                 "serial_baudrate": rplidar_serial_baudrate,
                 "frame_id": "laser",
                 "scan_topic": "/scan",
+            }.items(),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(slam_launch),
+            condition=IfCondition(use_slam),
+            launch_arguments={
+                "use_sim_time": "false",
             }.items(),
         ),
 
