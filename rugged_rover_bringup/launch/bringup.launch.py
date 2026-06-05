@@ -14,6 +14,7 @@ def generate_launch_description():
     rplidar_serial_port = LaunchConfiguration("rplidar_serial_port")
     rplidar_serial_baudrate = LaunchConfiguration("rplidar_serial_baudrate")
     use_slam = LaunchConfiguration("use_slam")
+    use_ekf = LaunchConfiguration("use_ekf")
     ekf_output_odom_topic = LaunchConfiguration("ekf_output_odom_topic")
 
     xacro_path = PathJoinSubstitution([
@@ -40,11 +41,11 @@ def generate_launch_description():
         "ekf.launch.py",
     ])
 
-    d435_launch = PathJoinSubstitution([
-        FindPackageShare("rugged_rover_bringup"),
-        "launch",
-        "d435.launch.py",
-    ])
+    # d435_launch = PathJoinSubstitution([
+    #     FindPackageShare("rugged_rover_bringup"),
+    #     "launch",
+    #     "d435.launch.py",
+    # ])
 
     rplidar_launch = PathJoinSubstitution([
         FindPackageShare("rugged_rover_bringup"),
@@ -92,6 +93,11 @@ def generate_launch_description():
             description="Launch slam_toolbox for live mapping.",
         ),
         DeclareLaunchArgument(
+            "use_ekf",
+            default_value="false",
+            description="Launch robot_localization EKF. Disable while validating raw wheel odom.",
+        ),
+        DeclareLaunchArgument(
             "ekf_output_odom_topic",
             default_value="/odom",
             description=(
@@ -128,6 +134,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(ekf_launch),
+            condition=IfCondition(use_ekf),
             launch_arguments={
                 "use_sim_time": "false",
                 "odom_topic": "/diff_drive_controller/odom",

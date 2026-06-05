@@ -24,7 +24,7 @@ def generate_launch_description():
                 'enable_depth': 'true',
                 'enable_sync': 'true',
                 'align_depth.enable': 'true',
-                'pointcloud.enable': 'true',
+                'pointcloud.enable': 'false',
                 'publish_tf': 'true',
                 'tf_publish_rate': '0.0',
             }.items(),
@@ -36,14 +36,14 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'output_frame': 'camera_depth_frame',
-                'range_min': 0.25,
-                'range_max': 4.0,
-                'scan_height': 10,
+                'range_min': 0.15,
+                'range_max': 2.0,
+                'scan_height': 4,
             }],
             remappings=[
                 ('depth', '/camera/camera/depth/image_rect_raw'),
                 ('depth_camera_info', '/camera/camera/depth/camera_info'),
-                ('scan', '/scan'),
+                ('scan', '/depth_scan'),
             ],
         ),
     ])

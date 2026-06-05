@@ -18,8 +18,8 @@ ekf_filter_node:
     odom0: /odom_raw
     # Fuse raw wheel odom pose and twist first. This should behave almost like
     # diff_drive_controller odom, but keeps EKF in the pipeline for later IMU work.
-    odom0_config: [true,  true,  false,
-                   false, false, true,
+    odom0_config: [false,  false,  false,
+                   false, false, false,
                    true,  false, false,
                    false, false, true,
                    false, false, false]
