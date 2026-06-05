@@ -12,3 +12,4 @@ constexpr float BATTERY_R_TOP = 100000.0f;
 constexpr float BATTERY_R_BOTTOM = 33000.0f;
 constexpr float ADC_REFERENCE_VOLTAGE = 3.3f;
 constexpr float BATTERY_PUBLISH_PERIOD_MS = 1000.0f;
+constexpr unsigned long MOTOR_COMMAND_TIMEOUT_MS = 500;

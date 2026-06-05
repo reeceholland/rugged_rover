@@ -1,5 +1,6 @@
 #include "msg_utils.hpp"
 #include "battery_monitor.hpp"
+#include "battery_safety.hpp"
 #include "config.hpp"
 
 #if USE_ROS
@@ -45,7 +46,7 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   const bool is_feedback_msg = (&msg == &feedback_msg);
 
   rosidl_runtime_c__String* names = is_feedback_msg ? feedback_name_data : cmd_name_data;
-  char(*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
+  char (*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
   double* positions = is_feedback_msg ? feedback_position_data : cmd_position_data;
   double* velocities = is_feedback_msg ? feedback_velocity_data : cmd_velocity_data;
 
@@ -131,8 +132,14 @@ void publish_joint_state_message()
  */
 void subscription_callback(const void* msgin)
 {
+  if (battery_is_critical())
+  {
+    stop_motors();
+    return;
+  }
   //  Cast the incoming message to the expected type
   const sensor_msgs__msg__JointState* joint_msg = (const sensor_msgs__msg__JointState*) msgin;
+  bool received_motor_command = false;
 
   //  For each joint in the message, check the name and update the corresponding
   //  velocity setpoint
@@ -146,13 +153,30 @@ void subscription_callback(const void* msgin)
     const char* name = joint_msg->name.data[i].data;
     float velocity = joint_msg->velocity.data[i];
     if (strcmp(name, "front_left_joint") == 0)
+    {
       front_left_velocity_setpoint = velocity;
+      received_motor_command = true;
+    }
     else if (strcmp(name, "front_right_joint") == 0)
+    {
       front_right_velocity_setpoint = velocity;
+      received_motor_command = true;
+    }
     else if (strcmp(name, "rear_left_joint") == 0)
+    {
       front_left_velocity_setpoint = velocity;
+      received_motor_command = true;
+    }
     else if (strcmp(name, "rear_right_joint") == 0)
+    {
       front_right_velocity_setpoint = velocity;
+      received_motor_command = true;
+    }
+  }
+
+  if (received_motor_command)
+  {
+    mark_motor_command_received();
   }
 
   if (abs(front_left_velocity_setpoint) <= 0.05 && abs(front_right_velocity_setpoint) <= 0.05)
