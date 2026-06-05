@@ -30,6 +30,7 @@ float front_right_velocity_setpoint = 0;
 //  PID outputs
 float front_left_output = 0;
 float front_right_output = 0;
+unsigned long last_motor_command_ms = 0;
 
 //  The PID controller for the front left motor
 QuickPID front_left_pid(&current_front_left_rads_sec, &front_left_output,
@@ -53,6 +54,11 @@ void setup_pid()
 
   front_left_pid.SetMode(QuickPID::Control::automatic);
   front_right_pid.SetMode(QuickPID::Control::automatic);
+}
+
+void mark_motor_command_received()
+{
+  last_motor_command_ms = millis();
 }
 
 void stop_motors()
@@ -106,6 +112,12 @@ void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int
 void update_motors()
 {
   if (battery_is_critical())
+  {
+    stop_motors();
+    return;
+  }
+  if (USE_ROS &&
+      (last_motor_command_ms == 0 || millis() - last_motor_command_ms > MOTOR_COMMAND_TIMEOUT_MS))
   {
     stop_motors();
     return;

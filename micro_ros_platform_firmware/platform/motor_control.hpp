@@ -17,6 +17,7 @@ extern float front_left_velocity_setpoint;
 extern float front_right_velocity_setpoint;
 extern float front_left_output;
 extern float front_right_output;
+extern unsigned long last_motor_command_ms;
 extern QuickPID front_left_pid;
 extern QuickPID front_right_pid;
 
@@ -25,6 +26,7 @@ extern float current_front_left_rads_sec;
 extern float current_front_right_rads_sec;
 
 void setup_pid();
+void mark_motor_command_received();
 void stop_motors();
 void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int speed);
 void update_motors();

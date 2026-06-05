@@ -241,6 +241,8 @@ void ros_update()
       destroy_ros_entities();
       if (create_ros_entities())
       {
+        stop_motors();
+        last_motor_command_ms = 0;
         ros_state = RosConnectionState::Connected;
       }
       else
@@ -261,6 +263,7 @@ void ros_update()
     if (!agent_is_available())
     {
       stop_motors();
+      last_motor_command_ms = 0;
       destroy_ros_entities();
       ros_state = RosConnectionState::WaitingForAgent;
     }

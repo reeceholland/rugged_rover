@@ -19,6 +19,10 @@ void battery_safety_update(float battery_voltage)
   {
     critical_latched = true;
   }
+  else if (battery_voltage >= kRecoverVoltage)
+  {
+    critical_latched = false;
+  }
 }
 
 bool battery_is_critical()

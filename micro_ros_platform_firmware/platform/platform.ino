@@ -73,6 +73,7 @@ namespace
 
     front_left_velocity_setpoint = left;
     front_right_velocity_setpoint = right;
+    mark_motor_command_received();
 
     Serial.print("Setpoints: left=");
     Serial.print(front_left_velocity_setpoint, 3);
@@ -103,6 +104,7 @@ namespace
 
 void setup()
 {
+  Serial.begin(115200);
   Serial2.begin(9600);
 
   if (USE_ROS)
@@ -111,7 +113,6 @@ void setup()
   }
   else
   {
-    Serial.begin(115200);
     delay(1000);
     print_serial_help();
   }
@@ -136,6 +137,25 @@ void loop()
       publish_battery_voltage_message();
     }
     update_motors();
+  }
+
+  if (USE_ROS)
+  {
+    static unsigned long last_debug_ms = 0;
+    if (now - last_debug_ms >= 1000)
+    {
+      last_debug_ms = now;
+      Serial.print("ros=");
+      Serial.print(ros_is_connected() ? "connected" : "waiting");
+      Serial.print(" battery_critical=");
+      Serial.print(battery_is_critical() ? "true" : "false");
+      Serial.print(" last_cmd_age_ms=");
+      Serial.print(last_motor_command_ms == 0 ? -1 : static_cast<long>(now - last_motor_command_ms));
+      Serial.print(" setpoints FL=");
+      Serial.print(front_left_velocity_setpoint, 3);
+      Serial.print(" FR=");
+      Serial.println(front_right_velocity_setpoint, 3);
+    }
   }
 
   if (USE_ROS)
