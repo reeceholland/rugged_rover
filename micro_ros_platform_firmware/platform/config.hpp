@@ -5,6 +5,7 @@
 #define USE_ROS 1
 
 extern bool SERIAL_DEBUG;
+constexpr bool ROS_SERIAL_STATUS_DEBUG = false;
 
 #define BATTERY_VOLTAGE_PIN A9
 

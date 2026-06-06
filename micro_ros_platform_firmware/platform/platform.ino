@@ -139,7 +139,7 @@ void loop()
     update_motors();
   }
 
-  if (USE_ROS)
+  if (USE_ROS && ROS_SERIAL_STATUS_DEBUG)
   {
     static unsigned long last_debug_ms = 0;
     if (now - last_debug_ms >= 1000)

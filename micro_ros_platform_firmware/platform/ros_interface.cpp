@@ -93,7 +93,7 @@ namespace
     }
     node_created = true;
 
-    rcutils_logging_set_default_logger_level(RCUTILS_LOG_SEVERITY_DEBUG);
+    rcutils_logging_set_default_logger_level(RCUTILS_LOG_SEVERITY_WARN);
 
     sensor_msgs__msg__JointState__init(&cmd_msg);
     sensor_msgs__msg__JointState__init(&feedback_msg);
