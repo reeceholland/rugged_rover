@@ -135,6 +135,7 @@ void loop()
     {
       publish_joint_state_message();
       publish_battery_voltage_message();
+      publish_debug_message();
     }
     update_motors();
   }

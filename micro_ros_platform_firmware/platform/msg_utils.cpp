@@ -20,6 +20,7 @@ double cmd_position_data[MAX_JOINTS];
 double cmd_velocity_data[MAX_JOINTS];
 double feedback_position_data[MAX_JOINTS];
 double feedback_velocity_data[MAX_JOINTS];
+char debug_message_buffer[DEBUG_MESSAGE_LEN];
 
 namespace
 {
@@ -83,6 +84,14 @@ void initialise_battery_voltage_message(std_msgs__msg__Float32& msg)
   msg.data = 0.0f;
 }
 
+void initialise_debug_message(std_msgs__msg__String& msg)
+{
+  debug_message_buffer[0] = '\0';
+  msg.data.data = debug_message_buffer;
+  msg.data.size = 0;
+  msg.data.capacity = DEBUG_MESSAGE_LEN;
+}
+
 void publish_battery_voltage_message()
 {
   static unsigned long last_publish_ms = 0;
@@ -97,6 +106,43 @@ void publish_battery_voltage_message()
 
   battery_voltage_msg.data = read_battery_voltage();
   RCSOFTCHECK(rcl_publish(&battery_voltage_publisher, &battery_voltage_msg, NULL));
+}
+
+void publish_debug_message()
+{
+  static unsigned long last_publish_ms = 0;
+  const unsigned long now = millis();
+
+  if (now - last_publish_ms < DEBUG_PUBLISH_PERIOD_MS)
+  {
+    return;
+  }
+
+  last_publish_ms = now;
+
+  const long last_cmd_age_ms =
+      last_motor_command_ms == 0 ? -1 : static_cast<long>(now - last_motor_command_ms);
+
+  const int written = snprintf(
+      debug_message_buffer, DEBUG_MESSAGE_LEN,
+      "ros=%s battery_critical=%s battery_v=%.2f last_cmd_age_ms=%ld "
+      "setpoints_fl=%.3f setpoints_fr=%.3f measured_fl=%.3f measured_fr=%.3f "
+      "output_fl=%.2f output_fr=%.2f",
+      ros_is_connected() ? "connected" : "waiting", battery_is_critical() ? "true" : "false",
+      read_battery_voltage(), last_cmd_age_ms, front_left_velocity_setpoint,
+      front_right_velocity_setpoint, current_front_left_rads_sec, current_front_right_rads_sec,
+      front_left_output, front_right_output);
+
+  if (written < 0)
+  {
+    return;
+  }
+
+  debug_message_buffer[DEBUG_MESSAGE_LEN - 1] = '\0';
+  debug_msg.data.size =
+      written >= DEBUG_MESSAGE_LEN ? DEBUG_MESSAGE_LEN - 1 : static_cast<size_t>(written);
+
+  RCSOFTCHECK(rcl_publish(&debug_publisher, &debug_msg, NULL));
 }
 
 /**
@@ -187,4 +233,5 @@ void subscription_callback(const void* msgin)
 #else
 void publish_joint_state_message() {}
 void publish_battery_voltage_message() {}
+void publish_debug_message() {}
 #endif

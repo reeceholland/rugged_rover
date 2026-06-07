@@ -10,7 +10,7 @@
 // The encoder library counts quadrature edges. A 12 PPR encoder normally
 // produces 48 counts per motor revolution when both channels are decoded.
 constexpr float ENCODER_COUNTS_PER_MOTOR_REV = 48.0;
-constexpr float GEAR_RATIO_MULTIPLIER = 27.0;
+constexpr float GEAR_RATIO_MULTIPLIER = 51.0;
 
 // Control variables
 extern float front_left_velocity_setpoint;
