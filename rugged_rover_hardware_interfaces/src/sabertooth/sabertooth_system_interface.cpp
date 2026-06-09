@@ -1,7 +1,9 @@
 #include "rugged_rover_hardware_interfaces/sabertooth/sabertooth_system_interface.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
@@ -101,9 +103,23 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     RCLCPP_INFO(this->logger_, "Using %s QoS for platform motor commands",
                 use_reliable_command_qos_ ? "reliable" : "best_effort");
 
-    cmd_pub_ = node_->create_publisher<sensor_msgs::msg::JointState>("platform/motors/cmd",
-                                                                     command_qos);
+    cmd_pub_ =
+        node_->create_publisher<sensor_msgs::msg::JointState>("platform/motors/cmd", command_qos);
     last_command_publish_time_ = node_->now();
+
+    executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+    executor_->add_node(node_);
+
+    executor_running_.store(true);
+    executor_thread_ = std::thread(
+        [this]()
+        {
+          while (executor_running_.load() && rclcpp::ok())
+          {
+            executor_->spin_some(std::chrono::milliseconds(5));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          }
+        });
 
     // Return success if activation is complete
     return hardware_interface::CallbackReturn::SUCCESS;
@@ -130,6 +146,23 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     battery_critical_sub_.reset();
     cmd_pub_.reset();
     node_.reset();
+
+    executor_running_.store(false);
+    if (executor_)
+    {
+      executor_->cancel();
+    }
+    if (executor_thread_.joinable())
+    {
+      executor_thread_.join();
+    }
+
+    if (executor_ && node_)
+    {
+      executor_->remove_node(node_);
+    }
+
+    executor_.reset();
 
     // Return success if deactivation is complete
     return hardware_interface::CallbackReturn::SUCCESS;
@@ -197,10 +230,6 @@ namespace rugged_rover_hardware_interfaces::sabertooth
   hardware_interface::return_type SabertoothSystemInterface::read(const rclcpp::Time&,
                                                                   const rclcpp::Duration&)
   {
-    if (node_)
-    {
-      rclcpp::spin_some(node_);
-    }
 
     std::lock_guard<std::mutex> lock(feedback_mutex_);
 
@@ -279,6 +308,8 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     if (!battery_allows_motion_.load())
     {
       cmd_msg.velocity.assign(joint_names_.size(), 0.0);
+      RCLCPP_WARN(this->logger_,
+                  "Battery is critical, not sending motor commands to prevent brownout.");
     }
     else
     {
