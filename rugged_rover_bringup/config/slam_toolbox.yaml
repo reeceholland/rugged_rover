@@ -75,7 +75,7 @@ slam_toolbox:
     link_scan_maximum_distance: 1.5
 
     # Loop closure can fix drift, but can also cause large pose jumps if false matches occur.
-    do_loop_closing: true
+    do_loop_closing: false
 
     # Maximum distance to search for loop closures.
     loop_search_maximum_distance: 1.5
