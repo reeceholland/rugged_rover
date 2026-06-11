@@ -1,296 +1,374 @@
+# Nav2 simulation parameters for Rugged Rover.
+#
+# Frame assumptions:
+# - slam_toolbox publishes map -> odom.
+# - EKF or diff_drive_controller publishes odom -> base_link.
+# - robot_state_publisher publishes base_link -> sensor/wheel frames.
+#
+# Command assumptions:
+# - controller_server and behavior_server publish /cmd_vel_nav.
+# - velocity_smoother converts /cmd_vel_nav to /cmd_vel_smoothed.
+# - collision_monitor passes /cmd_vel_smoothed to /cmd_vel.
+# - cmd_vel_to_diff_drive converts /cmd_vel to /diff_drive_controller/cmd_vel.
+#
+# This file includes every node launched by ROS 2 Jazzy nav2_bringup/navigation_launch.py.
+# Some sections, such as docking_server and route_server, are present mostly so lifecycle
+# activation succeeds while simulation tuning focuses on planning and path following.
+
 bt_navigator:
   ros__parameters:
-    use_sim_time: true
-    global_frame: map
-    robot_base_frame: base_link
-    odom_topic: /odom
-    bt_loop_duration: 10
-    default_server_timeout: 20
-    wait_for_service_timeout: 1000
-    navigators: ["navigate_to_pose", "navigate_through_poses"]
-    navigate_to_pose:
-      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
-    navigate_through_poses:
-      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    use_sim_time: true                 # Read time from Unity /clock instead of the computer wall clock.
+    global_frame: map                  # Frame used for global navigation goals and plans.
+    robot_base_frame: base_link        # Main robot body frame used for robot pose queries.
+    odom_topic: /odom                  # Odometry topic used by BT plugins that need robot motion feedback.
+    bt_loop_duration: 20               # Behavior tree tick period in milliseconds; lower is more responsive but heavier.
+    default_server_timeout: 20         # Seconds to wait for action/service servers before reporting failure.
+    navigators: ["navigate_to_pose", "navigate_through_poses"]  # Action interfaces exposed by bt_navigator.
 
 controller_server:
   ros__parameters:
-    use_sim_time: true
-    controller_frequency: 20.0
-    min_x_velocity_threshold: 0.001
-    min_y_velocity_threshold: 0.5
-    min_theta_velocity_threshold: 0.001
-    failure_tolerance: 0.3
-    progress_checker_plugins: ["progress_checker"]
-    goal_checker_plugins: ["general_goal_checker"]
-    controller_plugins: ["FollowPath"]
+    use_sim_time: true                 # Keep controller timing aligned with Unity /clock.
+    controller_frequency: 10.0         # Local controller update rate in Hz; 10 Hz is easier on Unity/WSL than 20 Hz.
+    odom_topic: /odom                  # Odometry used to estimate current robot velocity.
+    failure_tolerance: 0.5             # Seconds of temporary controller failure allowed before aborting the goal.
+
+    min_x_velocity_threshold: 0.001    # Treat tiny forward velocity readings as zero.
+    min_y_velocity_threshold: 0.5      # Effectively ignores lateral velocity because this rover is differential/skid steer.
+    min_theta_velocity_threshold: 0.001 # Treat tiny angular velocity readings as zero.
+
+    progress_checker_plugins: ["progress_checker"] # Names of progress checker plugins loaded below.
+    goal_checker_plugins: ["general_goal_checker"] # Names of goal checker plugins loaded below.
+    controller_plugins: ["FollowPath"] # Names of path-following controller plugins loaded below.
+
+    current_progress_checker: progress_checker # Select the active progress checker by plugin name.
+    current_goal_checker: general_goal_checker # Select the active goal checker by plugin name.
 
     progress_checker:
-      plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.25
-      movement_time_allowance: 10.0
+      plugin: "nav2_controller::SimpleProgressChecker" # Checks that the robot is not stuck.
+      required_movement_radius: 0.15   # Minimum distance the robot must move to count as progress.
+      movement_time_allowance: 15.0    # Seconds allowed to achieve required_movement_radius before failing.
 
     general_goal_checker:
-      stateful: true
-      plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.25
-      yaw_goal_tolerance: 0.25
+      plugin: "nav2_controller::SimpleGoalChecker" # Checks whether the robot has reached the final pose.
+      xy_goal_tolerance: 0.25          # Allowed final XY position error in metres.
+      yaw_goal_tolerance: 0.35         # Allowed final heading error in radians.
+      stateful: true                   # Keeps goal-checker state once XY tolerance is achieved.
 
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
-      debug_trajectory_details: false
-      min_vel_x: 0.0
-      min_vel_y: 0.0
-      max_vel_x: 0.35
-      max_vel_y: 0.0
-      max_vel_theta: 0.8
-      min_speed_xy: 0.0
-      max_speed_xy: 0.35
-      min_speed_theta: 0.0
-      acc_lim_x: 0.6
-      acc_lim_y: 0.0
-      acc_lim_theta: 1.2
-      decel_lim_x: -0.6
-      decel_lim_y: 0.0
-      decel_lim_theta: -1.2
-      vx_samples: 20
-      vy_samples: 1
-      vtheta_samples: 20
-      sim_time: 1.7
-      linear_granularity: 0.05
-      angular_granularity: 0.025
-      transform_tolerance: 0.3
-      xy_goal_tolerance: 0.25
-      trans_stopped_velocity: 0.05
-      short_circuit_trajectory_evaluation: true
-      stateful: true
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      PathAlign.forward_point_distance: 0.1
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 32.0
-      GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
+      plugin: "dwb_core::DWBLocalPlanner" # Dynamic Window local planner used to convert paths into velocity commands.
+      debug_trajectory_details: false  # Disable verbose trajectory scoring logs.
+
+      min_vel_x: 0.0                   # Minimum commanded forward velocity; zero prevents planned reverse driving.
+      max_vel_x: 0.25                  # Maximum commanded forward speed in m/s.
+      max_vel_y: 0.0                   # No sideways velocity for a differential/skid-steer rover.
+      max_vel_theta: 1.2               # Maximum commanded yaw rate in rad/s.
+
+      min_speed_xy: 0.0                # Minimum translational speed magnitude considered by DWB.
+      max_speed_xy: 0.25               # Maximum translational speed magnitude considered by DWB.
+      min_speed_theta: 0.0             # Minimum rotational speed magnitude considered by DWB.
+
+      acc_lim_x: 0.5                   # Maximum forward acceleration in m/s^2.
+      decel_lim_x: -0.5                # Maximum forward deceleration in m/s^2; negative by Nav2 convention.
+      acc_lim_y: 0.0                   # No lateral acceleration for diff drive.
+      decel_lim_y: 0.0                 # No lateral deceleration for diff drive.
+      acc_lim_theta: 1.8               # Maximum angular acceleration in rad/s^2.
+      decel_lim_theta: -1.8            # Maximum angular deceleration in rad/s^2; negative by Nav2 convention.
+
+      vx_samples: 12                   # Number of forward velocity samples tested per planning cycle.
+      vy_samples: 1                    # One lateral sample because lateral motion is disabled.
+      vtheta_samples: 24               # Number of angular velocity samples; more helps turning-in-place choices.
+      sim_time: 1.5                    # Seconds each candidate command is simulated into the future.
+      linear_granularity: 0.05         # Distance spacing in metres for collision checks along simulated trajectories.
+      angular_granularity: 0.025       # Angular spacing in radians for collision checks along simulated trajectories.
+      transform_tolerance: 0.5         # How much TF delay Nav2 tolerates before rejecting transforms.
+      xy_goal_tolerance: 0.25          # DWB goal XY tolerance in metres.
+      trans_stopped_velocity: 0.05     # Translational speed below which the robot is considered stopped.
+      short_circuit_trajectory_evaluation: true # Stop scoring a trajectory once it is already worse than the best candidate.
+      stateful: true                   # Preserve controller state between cycles for smoother goal behaviour.
+
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"] # Ordered trajectory scoring plugins.
+      BaseObstacle.scale: 0.02         # Penalty weight for paths close to obstacles.
+      PathAlign.scale: 20.0            # Penalty weight for heading alignment with the global path.
+      PathAlign.forward_point_distance: 0.15 # Lookahead point distance used by PathAlign.
+      GoalAlign.scale: 16.0            # Penalty weight for heading alignment toward the goal.
+      GoalAlign.forward_point_distance: 0.15 # Lookahead point distance used by GoalAlign.
+      PathDist.scale: 24.0             # Penalty weight for distance away from the global path.
+      GoalDist.scale: 16.0             # Penalty weight for distance remaining to the goal.
+      RotateToGoal.scale: 48.0         # Penalty weight that encourages rotating to the final goal heading.
+      RotateToGoal.slowing_factor: 3.0 # How strongly the robot slows while rotating into the goal heading.
+      RotateToGoal.lookahead_time: -1.0 # Negative uses the full simulated trajectory for rotate-to-goal checks.
 
 local_costmap:
   local_costmap:
     ros__parameters:
-      use_sim_time: true
-      update_frequency: 5.0
-      publish_frequency: 2.0
-      global_frame: odom
-      robot_base_frame: base_link
-      rolling_window: true
-      width: 5
-      height: 5
-      resolution: 0.05
-      robot_radius: 0.22
-      transform_tolerance: 0.3
-      plugins: ["obstacle_layer", "inflation_layer"]
+      use_sim_time: true               # Keep local costmap timestamps aligned with Unity /clock.
+      global_frame: odom               # Local costmap frame; odom is continuous and avoids map correction jumps.
+      robot_base_frame: base_link      # Robot frame used to center the rolling costmap.
+      update_frequency: 5.0            # How often obstacle data is processed in Hz.
+      publish_frequency: 2.0           # How often the costmap is published for RViz/debugging in Hz.
+      rolling_window: true             # Move the costmap window with the robot.
+      width: 4                         # Local costmap width in metres.
+      height: 4                        # Local costmap height in metres.
+      resolution: 0.05                 # Cell size in metres per costmap pixel.
+      transform_tolerance: 0.5         # Allowed TF delay when transforming sensor data into the costmap.
+
+      footprint: "[[0.20, 0.18], [0.20, -0.18], [-0.20, -0.18], [-0.20, 0.18]]" # Rectangular rover footprint in base_link metres.
+
+      plugins: ["obstacle_layer", "inflation_layer"] # Costmap layers applied in order.
+
       obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: true
-        observation_sources: scan
+        plugin: "nav2_costmap_2d::ObstacleLayer" # Adds live obstacles from laser scan data.
+        enabled: true                 # Enable obstacle processing.
+        observation_sources: scan      # Name of the scan source configured below.
+
         scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: true
-          marking: true
-          data_type: "LaserScan"
-          raytrace_max_range: 20.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 20.0
-          obstacle_min_range: 0.0
+          topic: /scan                 # LaserScan topic from Unity lidar.
+          data_type: "LaserScan"       # Input message type expected by this source.
+          marking: true                # Add detected obstacles to the costmap.
+          clearing: true               # Raytrace free space between robot and detected obstacles.
+          max_obstacle_height: 1.0     # Ignore scan points above this height in metres.
+          obstacle_min_range: 0.1      # Ignore obstacle returns closer than this distance in metres.
+          obstacle_max_range: 7.0      # Mark obstacles out to this distance in metres.
+          raytrace_min_range: 0.1      # Start clearing rays at this distance in metres.
+          raytrace_max_range: 8.0      # Clear free space out to this distance in metres.
+
       inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.35
-      always_send_full_costmap: true
+        plugin: "nav2_costmap_2d::InflationLayer" # Expands obstacle costs around marked cells.
+        inflation_radius: 0.35         # Safety buffer around obstacles in metres.
+        cost_scaling_factor: 4.0       # Higher values make inflated cost drop off more quickly.
+
+      always_send_full_costmap: true   # Publish full costmaps instead of incremental updates for simpler RViz/debug behaviour.
 
 global_costmap:
   global_costmap:
     ros__parameters:
-      use_sim_time: true
-      update_frequency: 1.0
-      publish_frequency: 1.0
-      global_frame: map
-      robot_base_frame: base_link
-      robot_radius: 0.22
-      resolution: 0.05
-      track_unknown_space: true
-      transform_tolerance: 0.3
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      use_sim_time: true               # Keep global costmap timestamps aligned with Unity /clock.
+      global_frame: map                # Global costmap lives in the SLAM map frame.
+      robot_base_frame: base_link      # Robot frame used for pose and footprint projection.
+      update_frequency: 2.0            # How often the global costmap updates in Hz.
+      publish_frequency: 1.0           # How often the global costmap is published in Hz.
+      resolution: 0.05                 # Cell size in metres per costmap pixel.
+      transform_tolerance: 0.5         # Allowed TF delay when transforming robot/sensor poses.
+      track_unknown_space: true        # Preserve unknown map space instead of treating it all as free.
+
+      footprint: "[[0.20, 0.18], [0.20, -0.18], [-0.20, -0.18], [-0.20, 0.18]]" # Same rover footprint as local costmap.
+
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"] # Static map, live obstacles, then safety inflation.
+
       static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: true
+        plugin: "nav2_costmap_2d::StaticLayer" # Imports occupancy grid data from /map.
+        map_subscribe_transient_local: true # Use latched/transient map data from slam_toolbox.
+
       obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: true
-        observation_sources: scan
+        plugin: "nav2_costmap_2d::ObstacleLayer" # Adds live scan obstacles on top of the map.
+        enabled: true                 # Enable live obstacle processing.
+        observation_sources: scan      # Name of the scan source configured below.
+
         scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: true
-          marking: true
-          data_type: "LaserScan"
-          raytrace_max_range: 20.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 20.0
-          obstacle_min_range: 0.0
+          topic: /scan                 # LaserScan topic from Unity lidar.
+          data_type: "LaserScan"       # Input message type expected by this source.
+          marking: true                # Add detected obstacles to the global costmap.
+          clearing: true               # Raytrace free space from scan data.
+          max_obstacle_height: 1.0     # Ignore scan points above this height in metres.
+          obstacle_min_range: 0.1      # Ignore obstacle returns closer than this distance in metres.
+          obstacle_max_range: 7.0      # Mark obstacles out to this distance in metres.
+          raytrace_min_range: 0.1      # Start clearing rays at this distance in metres.
+          raytrace_max_range: 8.0      # Clear free space out to this distance in metres.
+
       inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.35
-      always_send_full_costmap: true
+        plugin: "nav2_costmap_2d::InflationLayer" # Expands obstacle costs around marked cells.
+        inflation_radius: 0.35         # Safety buffer around obstacles in metres.
+        cost_scaling_factor: 4.0       # Higher values make inflated cost drop off more quickly.
+
+      always_send_full_costmap: true   # Publish full global costmap for simpler debugging.
 
 planner_server:
   ros__parameters:
-    use_sim_time: true
-    expected_planner_frequency: 5.0
-    planner_plugins: ["GridBased"]
+    use_sim_time: true                 # Keep planner timing aligned with Unity /clock.
+    expected_planner_frequency: 2.0    # Expected global planning rate in Hz.
+    planner_plugins: ["GridBased"]     # Names of global planner plugins loaded below.
+
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.5
-      use_astar: false
-      allow_unknown: true
+      plugin: "nav2_navfn_planner::NavfnPlanner" # Classic grid-based global planner.
+      tolerance: 0.5                   # Allow planning to a nearby valid cell if exact goal is blocked.
+      use_astar: false                 # Use Dijkstra-style NavFn rather than A*.
+      allow_unknown: true              # Allow plans through unknown map space while SLAM is still growing.
 
 smoother_server:
   ros__parameters:
-    use_sim_time: true
-    smoother_plugins: ["simple_smoother"]
+    use_sim_time: true                 # Keep smoother timing aligned with Unity /clock.
+    smoother_plugins: ["simple_smoother"] # Names of path smoother plugins loaded below.
+
     simple_smoother:
-      plugin: "nav2_smoother::SimpleSmoother"
-      tolerance: 1.0e-10
-      max_its: 1000
-      do_refinement: true
-
-behavior_server:
-  ros__parameters:
-    use_sim_time: true
-    local_costmap_topic: local_costmap/costmap_raw
-    global_costmap_topic: global_costmap/costmap_raw
-    local_footprint_topic: local_costmap/published_footprint
-    global_footprint_topic: global_costmap/published_footprint
-    cycle_frequency: 10.0
-    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
-    spin:
-      plugin: "nav2_behaviors::Spin"
-    backup:
-      plugin: "nav2_behaviors::BackUp"
-    drive_on_heading:
-      plugin: "nav2_behaviors::DriveOnHeading"
-    wait:
-      plugin: "nav2_behaviors::Wait"
-    global_frame: odom
-    robot_base_frame: base_link
-    transform_tolerance: 0.3
-    simulate_ahead_time: 2.0
-    max_rotational_vel: 0.8
-    min_rotational_vel: 0.2
-    rotational_acc_lim: 1.2
-
-waypoint_follower:
-  ros__parameters:
-    use_sim_time: true
-    loop_rate: 20
-    stop_on_failure: false
-    waypoint_task_executor_plugin: "wait_at_waypoint"
-    wait_at_waypoint:
-      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
-      enabled: true
-      waypoint_pause_duration: 200
+      plugin: "nav2_smoother::SimpleSmoother" # Basic path smoother for global plans.
+      tolerance: 1.0e-10               # Numeric convergence tolerance for smoothing.
+      max_its: 1000                    # Maximum smoothing iterations.
+      do_refinement: true              # Run refinement passes after the first smoothing pass.
 
 velocity_smoother:
   ros__parameters:
-    use_sim_time: true
-    smoothing_frequency: 20.0
-    scale_velocities: false
-    feedback: "OPEN_LOOP"
-    max_velocity: [0.35, 0.0, 0.8]
-    min_velocity: [0.0, 0.0, -0.8]
-    max_accel: [0.6, 0.0, 1.2]
-    max_decel: [-0.6, 0.0, -1.2]
-    odom_topic: /odom
-    odom_duration: 0.1
-    deadband_velocity: [0.0, 0.0, 0.0]
-    velocity_timeout: 1.0
+    use_sim_time: true                 # Keep velocity smoother timing aligned with Unity /clock.
+    smoothing_frequency: 20.0          # Rate in Hz for publishing smoothed velocity commands.
+    stamp_smoothed_velocity_with_smoothing_time: false # Keep output Twist unstamped; bridge handles TwistStamped conversion later.
+    scale_velocities: false            # Do not scale all velocity components together when limiting one axis.
+    feedback: "OPEN_LOOP"              # Smooth based on commands rather than odometry feedback, simpler for simulation.
+
+    max_velocity: [0.25, 0.0, 1.2]     # Maximum [x, y, yaw] velocities in m/s, m/s, rad/s.
+    min_velocity: [-0.05, 0.0, -1.2]   # Minimum [x, y, yaw] velocities; small reverse allowed for behaviours.
+    max_accel: [0.5, 0.0, 1.8]         # Maximum [x, y, yaw] acceleration.
+    max_decel: [-0.5, 0.0, -1.8]       # Maximum [x, y, yaw] deceleration; negative by Nav2 convention.
+    deadband_velocity: [0.0, 0.0, 0.0] # Velocity components below these values are forced to zero.
+
+    odom_topic: /odom                  # Odometry topic used if feedback mode is changed later.
+    odom_duration: 0.1                 # Time window in seconds for estimating odometry velocity.
+    velocity_timeout: 1.0              # Seconds after last input command before output is forced to zero.
 
 collision_monitor:
   ros__parameters:
-    use_sim_time: true
-    base_frame_id: "base_link"
-    odom_frame_id: "odom"
-    cmd_vel_in_topic: "cmd_vel_smoothed"
-    cmd_vel_out_topic: "cmd_vel"
-    state_topic: "collision_monitor_state"
-    transform_tolerance: 0.3
-    source_timeout: 1.0
-    base_shift_correction: true
-    stop_pub_timeout: 2.0
+    use_sim_time: true                 # Keep collision monitor timing aligned with Unity /clock.
+    cmd_vel_in_topic: /cmd_vel_smoothed # Smoothed command input topic.
+    cmd_vel_out_topic: /cmd_vel        # Safety-filtered command output topic consumed by the diff-drive bridge.
+    base_frame_id: base_link           # Robot body frame for collision projections.
+    odom_frame_id: odom                # Continuous frame used for short-term motion projection.
+    state_topic: /collision_monitor_state # Topic publishing monitor state/debug status.
+    transform_tolerance: 0.5           # Allowed TF delay for collision projections.
+    source_timeout: 1.0                # Seconds before a sensor source is considered stale.
+    base_shift_correction: true        # Account for base frame shift during projected motion.
+    stop_pub_timeout: 2.0              # Seconds to continue publishing stop commands after a stop condition.
+    polygons: ["FootprintApproach"]    # Collision zones configured below.
 
-    polygons: ["FootprintApproach"]
     FootprintApproach:
-      type: "polygon"
-      action_type: "approach"
-      footprint_topic: "/local_costmap/published_footprint"
-      time_before_collision: 1.2
-      simulation_time_step: 0.1
-      min_points: 6
-      visualize: false
-      enabled: true
+      type: "polygon"                  # Polygon zone around the robot.
+      action_type: "approach"          # Slow/stop based on projected time to collision.
+      footprint_topic: /local_costmap/published_footprint # Footprint polygon source from local costmap.
+      time_before_collision: 1.2       # Seconds ahead to check for collision.
+      simulation_time_step: 0.1        # Time step in seconds for projected collision simulation.
+      min_points: 6                    # Minimum scan points in the zone before action triggers.
+      visualize: false                 # Disable marker visualization unless debugging collision monitor.
+      enabled: true                    # Enable this collision zone.
 
-    observation_sources: ["scan"]
+    observation_sources: ["scan"]      # Sensor sources used by collision monitor.
+
     scan:
-      type: "scan"
-      topic: "scan"
-      min_height: 0.0
-      max_height: 2.0
-      enabled: true
+      type: "scan"                     # Source type is LaserScan.
+      topic: /scan                     # LaserScan topic from Unity lidar.
+      min_height: 0.0                  # Minimum obstacle height considered by this source.
+      max_height: 1.0                  # Maximum obstacle height considered by this source.
+      enabled: true                    # Enable this observation source.
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: true                 # Keep behavior timing aligned with Unity /clock.
+    local_costmap_topic: /local_costmap/costmap_raw # Local costmap used by behaviours.
+    global_costmap_topic: /global_costmap/costmap_raw # Global costmap used by behaviours.
+    local_footprint_topic: /local_costmap/published_footprint # Local footprint topic used for collision checks.
+    global_footprint_topic: /global_costmap/published_footprint # Global footprint topic used for collision checks.
+    cycle_frequency: 5.0               # Behaviour server update rate in Hz.
+    behavior_plugins: ["spin", "backup", "wait"] # Recovery/utility behaviours loaded below.
+
+    spin:
+      plugin: "nav2_behaviors::Spin"   # In-place rotation behaviour.
+
+    backup:
+      plugin: "nav2_behaviors::BackUp" # Reverse motion behaviour.
+
+    wait:
+      plugin: "nav2_behaviors::Wait"   # Wait-in-place behaviour.
+
+    global_frame: odom                 # Frame used for behaviour execution; odom avoids map correction jumps.
+    robot_base_frame: base_link        # Robot body frame used by behaviours.
+    transform_tolerance: 0.5           # Allowed TF delay for behaviour transforms.
+    simulate_ahead_time: 2.0           # Seconds ahead to simulate behaviour collision risk.
+    max_rotational_vel: 1.2            # Maximum rotation speed for spin behaviour.
+    min_rotational_vel: 0.2            # Minimum rotation speed for spin behaviour.
+    rotational_acc_lim: 1.8            # Angular acceleration limit for spin behaviour.
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: true                 # Keep waypoint follower timing aligned with Unity /clock.
+    loop_rate: 10                      # Waypoint follower loop rate in Hz.
+    stop_on_failure: false             # Continue remaining waypoints if one waypoint task fails.
+    waypoint_task_executor_plugin: "wait_at_waypoint" # Task plugin executed at each waypoint.
+
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint" # Wait task plugin for waypoint arrivals.
+      enabled: true                    # Enable waiting at waypoints.
+      waypoint_pause_duration: 200     # Pause duration at each waypoint in milliseconds.
+
+route_server:
+  ros__parameters:
+    use_sim_time: true                 # Keep route server timing aligned with Unity /clock.
+    boundary_radius_to_achieve_node: 1.0 # Radius in metres for reaching boundary route nodes.
+    radius_to_achieve_node: 2.0        # Radius in metres for reaching normal route nodes.
+    smooth_corners: true               # Smooth route graph corners when generating paths.
+    operations: ["AdjustSpeedLimit", "ReroutingService", "CollisionMonitor"] # Route operations loaded below.
+
+    ReroutingService:
+      plugin: "nav2_route::ReroutingService" # Enables route replanning service support.
+
+    AdjustSpeedLimit:
+      plugin: "nav2_route::AdjustSpeedLimit" # Enables speed limit operations along routes.
+
+    CollisionMonitor:
+      plugin: "nav2_route::CollisionMonitor" # Checks route segments for collision risk.
+      max_collision_dist: 3.0          # Maximum route distance in metres checked for collisions.
+
+    edge_cost_functions: ["DistanceScorer", "CostmapScorer"] # Cost functions used to score graph edges.
+
+    DistanceScorer:
+      plugin: "nav2_route::DistanceScorer" # Scores route edges by distance.
+
+    CostmapScorer:
+      plugin: "nav2_route::CostmapScorer" # Scores route edges using costmap costs.
 
 docking_server:
   ros__parameters:
-    use_sim_time: true
-    controller_frequency: 50.0
-    initial_perception_timeout: 5.0
-    wait_charge_timeout: 5.0
-    dock_approach_timeout: 30.0
-    undock_linear_tolerance: 0.05
-    undock_angular_tolerance: 0.1
-    max_retries: 3
-    base_frame: "base_link"
-    fixed_frame: "odom"
-    dock_backwards: false
-    dock_prestaging_tolerance: 0.5
+    use_sim_time: true                 # Keep docking timing aligned with Unity /clock.
+    controller_frequency: 20.0         # Docking controller update rate in Hz.
+    initial_perception_timeout: 5.0    # Seconds to wait for initial dock perception.
+    wait_charge_timeout: 5.0           # Seconds to wait for charging confirmation.
+    dock_approach_timeout: 30.0        # Seconds allowed for final docking approach.
+    undock_linear_tolerance: 0.05      # Linear tolerance in metres for undocking completion.
+    undock_angular_tolerance: 0.1      # Angular tolerance in radians for undocking completion.
+    max_retries: 3                     # Maximum docking retry attempts.
+    base_frame: base_link              # Robot body frame used by docking.
+    fixed_frame: odom                  # Fixed frame used by docking; odom avoids map correction jumps.
+    dock_backwards: false              # Approach docks driving forward rather than backward.
+    dock_prestaging_tolerance: 0.5     # Tolerance in metres for reaching the pre-dock staging pose.
+    dock_plugins: ["simple_charging_dock"] # Dock type plugins loaded below.
 
-    dock_plugins: ["simple_charging_dock"]
     simple_charging_dock:
-      plugin: "opennav_docking::SimpleChargingDock"
-      docking_threshold: 0.05
-      staging_x_offset: -0.7
-      use_external_detection_pose: true
-      use_battery_status: false
-      use_stall_detection: false
-      external_detection_timeout: 1.0
-      external_detection_translation_x: -0.18
-      external_detection_translation_y: 0.0
-      external_detection_rotation_roll: -1.57
-      external_detection_rotation_pitch: -1.57
-      external_detection_rotation_yaw: 0.0
-      filter_coef: 0.1
+      plugin: "opennav_docking::SimpleChargingDock" # Generic charging dock plugin.
+      docking_threshold: 0.05          # Distance threshold in metres for final dock contact/alignment.
+      staging_x_offset: -0.7           # Offset in metres from dock pose to staging pose.
+      use_external_detection_pose: true # Expect an external perception pose if docking is used.
+      use_battery_status: false        # Do not require battery status feedback for sim docking config.
+      use_stall_detection: false       # Do not use motor stall detection for sim docking config.
+      external_detection_timeout: 1.0  # Seconds before external dock detection is considered stale.
+      external_detection_translation_x: -0.18 # X offset from detected marker/pose to actual dock frame.
+      external_detection_translation_y: 0.0 # Y offset from detected marker/pose to actual dock frame.
+      external_detection_rotation_roll: -1.57 # Roll offset from detected marker/pose to actual dock frame.
+      external_detection_rotation_pitch: -1.57 # Pitch offset from detected marker/pose to actual dock frame.
+      external_detection_rotation_yaw: 0.0 # Yaw offset from detected marker/pose to actual dock frame.
+      filter_coef: 0.1                 # Low-pass filter coefficient for detected dock pose.
+
+    docks: []                          # No named dock instances configured for simulation yet.
 
     controller:
-      k_phi: 3.0
-      k_delta: 2.0
-      v_linear_min: 0.15
-      v_linear_max: 0.15
-      use_collision_detection: true
-      costmap_topic: "local_costmap/costmap_raw"
-      footprint_topic: "local_costmap/published_footprint"
-      transform_tolerance: 0.1
-      projection_time: 5.0
-      simulation_step: 0.1
-      dock_collision_threshold: 0.3
+      k_phi: 3.0                       # Docking heading control gain.
+      k_delta: 2.0                     # Docking lateral/heading error control gain.
+      v_linear_min: 0.10               # Minimum docking linear speed in m/s.
+      v_linear_max: 0.15               # Maximum docking linear speed in m/s.
+      use_collision_detection: true    # Check local costmap while docking.
+      costmap_topic: /local_costmap/costmap_raw # Costmap topic used for docking collision detection.
+      footprint_topic: /local_costmap/published_footprint # Footprint topic used for docking collision detection.
+      transform_tolerance: 0.5         # Allowed TF delay during docking control.
+      projection_time: 5.0             # Seconds ahead to project docking trajectory.
+      simulation_step: 0.1             # Time step in seconds for docking trajectory projection.
+      dock_collision_threshold: 0.3    # Cost/clearance threshold used to detect docking collision risk.
+
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: true                 # Keep lifecycle manager timing aligned with Unity /clock.
+    autostart: true                    # Automatically configure and activate all listed Nav2 lifecycle nodes.
+    node_names: ["controller_server", "smoother_server", "planner_server", "route_server", "behavior_server", "velocity_smoother", "collision_monitor", "bt_navigator", "waypoint_follower", "docking_server"] # Nodes managed by Jazzy navigation_launch.py.
