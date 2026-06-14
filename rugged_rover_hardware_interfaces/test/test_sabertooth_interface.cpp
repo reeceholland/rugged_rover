@@ -1,3 +1,17 @@
+// Copyright 2026 Reece Holland
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "rugged_rover_hardware_interfaces/sabertooth/sabertooth_system_interface.hpp"
 #include "rugged_rover_interfaces/msg/rover_feedback.hpp"
 #include <gtest/gtest.h>
@@ -10,43 +24,43 @@ using sensor_msgs::msg::JointState;
 namespace rugged_rover_hardware_interfaces::sabertooth
 {
 
-  class SabertoothInterfaceTest : public ::testing::Test
+class SabertoothInterfaceTest : public ::testing::Test
+{
+protected:
+  void SetUp() override
   {
-  protected:
-    void SetUp() override
-    {
-      interface_ = std::make_shared<SabertoothSystemInterface>();
+    interface_ = std::make_shared<SabertoothSystemInterface>();
 
       // Simulate initialization
-      hardware_interface::HardwareInfo info;
-      hardware_interface::ComponentInfo joint;
-      joint.name = "front_left_joint";
-      info.joints.push_back(joint);
-      joint.name = "front_right_joint";
-      info.joints.push_back(joint);
+    hardware_interface::HardwareInfo info;
+    hardware_interface::ComponentInfo joint;
+    joint.name = "front_left_joint";
+    info.joints.push_back(joint);
+    joint.name = "front_right_joint";
+    info.joints.push_back(joint);
 
-      ASSERT_EQ(interface_->on_init(info), hardware_interface::CallbackReturn::SUCCESS);
+    ASSERT_EQ(interface_->on_init(info), hardware_interface::CallbackReturn::SUCCESS);
 
-      interface_->joint_names_ = {"front_left_joint", "front_right_joint"};
-      interface_->hw_positions_ = {0.0, 0.0};
-      interface_->hw_velocities_ = {0.0, 0.0};
+    interface_->joint_names_ = {"front_left_joint", "front_right_joint"};
+    interface_->hw_positions_ = {0.0, 0.0};
+    interface_->hw_velocities_ = {0.0, 0.0};
 
       // Prepare dummy feedback
-      JointState feedback;
-      feedback.name = {"front_left_joint", "front_right_joint"};
-      feedback.position = {1.23, 4.56};
-      feedback.velocity = {7.89, 0.12};
+    JointState feedback;
+    feedback.name = {"front_left_joint", "front_right_joint"};
+    feedback.position = {1.23, 4.56};
+    feedback.velocity = {7.89, 0.12};
 
-      {
-        std::lock_guard<std::mutex> lock(interface_->feedback_mutex_);
-        interface_->last_feedback_ = feedback;
-      }
+    {
+      std::lock_guard<std::mutex> lock(interface_->feedback_mutex_);
+      interface_->last_feedback_ = feedback;
     }
+  }
 
-    std::shared_ptr<SabertoothSystemInterface> interface_;
-  };
+  std::shared_ptr<SabertoothSystemInterface> interface_;
+};
 
-  TEST_F(SabertoothInterfaceTest, ReadUpdatesJointStatesCorrectly)
+TEST_F(SabertoothInterfaceTest, ReadUpdatesJointStatesCorrectly)
   {
     auto ret = interface_->read(rclcpp::Time(0), rclcpp::Duration(0, 0));
     EXPECT_EQ(ret, hardware_interface::return_type::OK);
@@ -55,9 +69,9 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     EXPECT_DOUBLE_EQ(interface_->get_hw_positions()[1], 4.56);
     EXPECT_DOUBLE_EQ(interface_->get_hw_velocities()[0], 7.89);
     EXPECT_DOUBLE_EQ(interface_->get_hw_velocities()[1], 0.12);
-  }
+}
 
-  TEST_F(SabertoothInterfaceTest, ExportsStateInterfaces)
+TEST_F(SabertoothInterfaceTest, ExportsStateInterfaces)
   {
     auto states = interface_->export_state_interfaces();
 
@@ -65,9 +79,9 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     EXPECT_EQ(states[0].get_prefix_name(), "front_left_joint");
     EXPECT_EQ(states[0].get_interface_name(), hardware_interface::HW_IF_POSITION);
-  }
+}
 
-  TEST_F(SabertoothInterfaceTest, ExportsCommandInterfaces)
+TEST_F(SabertoothInterfaceTest, ExportsCommandInterfaces)
   {
     auto commands = interface_->export_command_interfaces();
 
@@ -78,6 +92,6 @@ namespace rugged_rover_hardware_interfaces::sabertooth
 
     EXPECT_EQ(commands[1].get_prefix_name(), "front_right_joint");
     EXPECT_EQ(commands[1].get_interface_name(), hardware_interface::HW_IF_VELOCITY);
-  }
+}
 
 } // namespace rugged_rover_hardware_interfaces::sabertooth

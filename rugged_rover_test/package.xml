@@ -3,9 +3,9 @@
 <package format="3">
   <name>rugged_rover_test</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="reece.j.holland@gmail.com">reece</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Small test and command publishers for Rugged Rover bringup.</description>
+  <maintainer email="reece.j.holland@gmail.com">Reece Holland</maintainer>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

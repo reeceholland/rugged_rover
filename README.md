@@ -135,6 +135,57 @@ colcon build --symlink-install --packages-up-to rugged_rover_bringup
 source install/setup.bash
 ```
 
+## Formatting and Linting
+
+This repository uses the ROS 2 lint tools rather than raw `clang-format`:
+
+```bash
+cd ~/rugged_rover_ws/src/rugged_rover
+source /opt/ros/jazzy/setup.bash
+
+ament_uncrustify \
+  micro_ros_platform_firmware/platform \
+  rugged_rover_battery \
+  rugged_rover_hardware_interfaces \
+  rugged_rover_test
+
+ament_copyright \
+  micro_ros_platform_firmware/platform \
+  rugged_rover_battery \
+  rugged_rover_bringup \
+  rugged_rover_control \
+  rugged_rover_hardware_interfaces \
+  rugged_rover_interfaces \
+  rugged_rover_robot_description \
+  rugged_rover_test
+```
+
+To reformat C/C++ files in place:
+
+```bash
+ament_uncrustify --reformat \
+  micro_ros_platform_firmware/platform \
+  rugged_rover_battery \
+  rugged_rover_hardware_interfaces \
+  rugged_rover_test
+```
+
+To add missing ROS-style copyright headers:
+
+```bash
+ament_copyright --add-missing "Reece Holland" apache2 \
+  micro_ros_platform_firmware/platform \
+  rugged_rover_battery \
+  rugged_rover_bringup \
+  rugged_rover_control \
+  rugged_rover_hardware_interfaces \
+  rugged_rover_interfaces \
+  rugged_rover_robot_description \
+  rugged_rover_test
+```
+
+The parent repository intentionally excludes external/submodule code from these checks.
+
 ## Teensy Firmware
 
 Firmware lives in:
