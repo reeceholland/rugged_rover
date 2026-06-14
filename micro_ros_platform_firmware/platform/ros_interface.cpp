@@ -10,6 +10,7 @@
 #include <rmw_microros/ping.h>
 #include <sensor_msgs/msg/joint_state.h>
 #include <std_msgs/msg/float32.h>
+#include <std_msgs/msg/string.h>
 
 rcl_subscription_t joint_state_subscriber;
 rcl_publisher_t feedback_publisher;
@@ -18,10 +19,12 @@ rcl_allocator_t allocator;
 rclc_support_t support;
 rcl_node_t node;
 rcl_publisher_t battery_voltage_publisher;
+rcl_publisher_t debug_publisher;
 
 sensor_msgs__msg__JointState cmd_msg;
 sensor_msgs__msg__JointState feedback_msg;
 std_msgs__msg__Float32 battery_voltage_msg;
+std_msgs__msg__String debug_msg;
 
 extern "C" bool arduino_transport_open(struct uxrCustomTransport*)
 {
@@ -63,6 +66,7 @@ namespace
   bool support_created = false;
   bool node_created = false;
   bool battery_publisher_created = false;
+  bool debug_publisher_created = false;
   bool motor_subscription_created = false;
   bool feedback_publisher_created = false;
   bool executor_created = false;
@@ -93,18 +97,21 @@ namespace
     }
     node_created = true;
 
-    rcutils_logging_set_default_logger_level(RCUTILS_LOG_SEVERITY_DEBUG);
+    rcutils_logging_set_default_logger_level(RCUTILS_LOG_SEVERITY_WARN);
 
     sensor_msgs__msg__JointState__init(&cmd_msg);
     sensor_msgs__msg__JointState__init(&feedback_msg);
     initialise_joint_state_message(cmd_msg);
     initialise_joint_state_message(feedback_msg);
     initialise_battery_voltage_message(battery_voltage_msg);
+    initialise_debug_message(debug_msg);
 
     const rosidl_message_type_support_t* type_support =
         ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState);
     const rosidl_message_type_support_t* battery_type_support =
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32);
+    const rosidl_message_type_support_t* debug_type_support =
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String);
 
     rcl_subscription_options_t sub_ops = rcl_subscription_get_default_options();
     sub_ops.qos = rmw_qos_profile_sensor_data;
@@ -120,16 +127,24 @@ namespace
     }
     battery_publisher_created = true;
 
-    if (rcl_subscription_init(&joint_state_subscriber, &node, type_support,
-                              "platform/motors/cmd", &sub_ops) != RCL_RET_OK)
+    if (rcl_publisher_init(&debug_publisher, &node, debug_type_support, "platform/debug",
+                           &pub_ops) != RCL_RET_OK)
+    {
+      destroy_ros_entities();
+      return false;
+    }
+    debug_publisher_created = true;
+
+    if (rcl_subscription_init(&joint_state_subscriber, &node, type_support, "platform/motors/cmd",
+                              &sub_ops) != RCL_RET_OK)
     {
       destroy_ros_entities();
       return false;
     }
     motor_subscription_created = true;
 
-    if (rcl_publisher_init(&feedback_publisher, &node, type_support,
-                           "platform/motors/feedback", &pub_ops) != RCL_RET_OK)
+    if (rcl_publisher_init(&feedback_publisher, &node, type_support, "platform/motors/feedback",
+                           &pub_ops) != RCL_RET_OK)
     {
       destroy_ros_entities();
       return false;
@@ -166,6 +181,12 @@ namespace
     {
       rcl_publisher_fini(&feedback_publisher, &node);
       feedback_publisher_created = false;
+    }
+
+    if (debug_publisher_created)
+    {
+      rcl_publisher_fini(&debug_publisher, &node);
+      debug_publisher_created = false;
     }
 
     if (battery_publisher_created)
@@ -284,5 +305,8 @@ void spin_ros_executor()
 void ros_setup() {}
 void ros_update() {}
 void spin_ros_executor() {}
-bool ros_is_connected() { return false; }
+bool ros_is_connected()
+{
+  return false;
+}
 #endif

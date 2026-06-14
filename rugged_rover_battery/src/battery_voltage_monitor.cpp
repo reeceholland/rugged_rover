@@ -23,8 +23,8 @@ namespace rugged_rover_battery
 
     auto timer_period = std::chrono::milliseconds(500);
 
-    stale_timer_ = this->create_wall_timer(
-        timer_period, std::bind(&BatteryVoltageMonitor::timerCallback, this));
+    stale_timer_ = this->create_wall_timer(timer_period,
+                                           std::bind(&BatteryVoltageMonitor::timerCallback, this));
 
     // Initialize subscriber. Teensy firmware and Unity publish the raw voltage here.
     battery_voltage_sub_ = this->create_subscription<std_msgs::msg::Float32>(

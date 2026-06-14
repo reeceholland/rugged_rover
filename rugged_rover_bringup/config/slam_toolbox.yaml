@@ -1,23 +1,48 @@
 slam_toolbox:
   ros__parameters:
-    use_sim_time: true
+    # Use wall time on the real rover. Set true only in Unity/simulation with /clock.
+    use_sim_time: false
 
+    # Live mapping mode. SLAM consumes odom + laser scans and publishes map -> odom.
     mode: mapping
+
+    # Frame setup:
+    # odom -> base_link should come from wheel odom or EKF.
+    # map -> odom is produced by slam_toolbox.
     odom_frame: odom
     map_frame: map
     base_frame: base_link
+
+    # RPLIDAR scan topic.
     scan_topic: /scan
 
-    # Unity publishes odom -> base_link. SLAM publishes map -> odom.
-    transform_publish_period: 0.02
-    map_update_interval: 1.0
-    resolution: 0.05
-    max_laser_range: 30.0
-    minimum_time_interval: 0.05
-    transform_timeout: 0.3
-    tf_buffer_duration: 30.0
-    throttle_scans: 1
+    # How often slam_toolbox publishes the map -> odom transform.
+    # Lower is smoother in RViz but costs more CPU.
+    transform_publish_period: 0.05
 
+    # How often the occupancy grid /map is updated.
+    map_update_interval: 1.0
+
+    # Map cell size in metres. 0.05 means 5 cm per grid cell.
+    resolution: 0.05
+
+    # Ignore laser readings beyond this range.
+    max_laser_range: 8.0
+
+    # Minimum time between scans accepted by SLAM.
+    # Increase this to reduce CPU load.
+    minimum_time_interval: 0.1
+
+    # Time allowed when waiting for TF transforms.
+    transform_timeout: 0.3
+
+    # How long TF history is kept for scan matching.
+    tf_buffer_duration: 30.0
+
+    # Process every scan. Increase to 2 or 3 to reduce CPU load.
+    throttle_scans: 2
+
+    # Optimisation backend.
     solver_plugin: solver_plugins::CeresSolver
     ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
     ceres_preconditioner: SCHUR_JACOBI
@@ -25,34 +50,86 @@ slam_toolbox:
     ceres_dogleg_type: TRADITIONAL_DOGLEG
     ceres_loss_function: None
 
+    # Enable scan-to-map matching to correct odom drift.
     use_scan_matching: true
+
+    # Uses the scan centre of mass as part of matching.
     use_scan_barycenter: true
-    minimum_travel_distance: 0.05
-    minimum_travel_heading: 0.05
+
+    # Add a new scan only after moving this far.
+    minimum_travel_distance: 0.2
+
+    # Add a new scan only after rotating this much, radians.
+    minimum_travel_heading: 0.2
+
+    # Number of recent scans kept for local matching.
     scan_buffer_size: 10
+
+    # Maximum scan distance used in the scan buffer.
     scan_buffer_maximum_scan_distance: 10.0
+
+    # Minimum match confidence for local fine scan matching.
     link_match_minimum_response_fine: 0.1
+
+    # Maximum distance between linked scans.
     link_scan_maximum_distance: 1.5
 
-    do_loop_closing: true
-    loop_search_maximum_distance: 3.0
-    loop_match_minimum_chain_size: 10
-    loop_match_maximum_variance_coarse: 3.0
-    loop_match_minimum_response_coarse: 0.35
-    loop_match_minimum_response_fine: 0.45
+    # Loop closure can fix drift, but can also cause large pose jumps if false matches occur.
+    do_loop_closing: false
 
+    # Maximum distance to search for loop closures.
+    loop_search_maximum_distance: 1.5
+
+    # Minimum number of linked scans before accepting a loop closure candidate.
+    loop_match_minimum_chain_size: 15
+
+    # Coarse loop match variance threshold. Lower is stricter.
+    loop_match_maximum_variance_coarse: 1.0
+
+    # Minimum confidence for coarse loop closure matching.
+    loop_match_minimum_response_coarse: 0.55
+
+    # Minimum confidence for fine loop closure matching.
+    loop_match_minimum_response_fine: 0.65
+
+    # Local scan matching search window, metres.
     correlation_search_space_dimension: 0.5
+
+    # Resolution of the local scan matching search.
     correlation_search_space_resolution: 0.01
+
+    # Smearing helps tolerate noisy scans. Higher is more forgiving.
     correlation_search_space_smear_deviation: 0.1
-    loop_search_space_dimension: 8.0
+
+    # Loop closure search window, metres.
+    loop_search_space_dimension: 3.0
+
+    # Resolution of the loop closure search.
     loop_search_space_resolution: 0.05
+
+    # Smearing used during loop closure search.
     loop_search_space_smear_deviation: 0.03
 
+    # Penalty for scan matches that require large translation corrections.
     distance_variance_penalty: 0.5
+
+    # Penalty for scan matches that require large rotation corrections.
     angle_variance_penalty: 1.0
+
+    # Fine angular search step, radians.
     fine_search_angle_offset: 0.00349
+
+    # Coarse angular search range/step basis, radians.
     coarse_search_angle_offset: 0.349
+
+    # Coarse angular search resolution, radians.
     coarse_angle_resolution: 0.0349
+
+    # Minimum angular penalty applied during matching.
     minimum_angle_penalty: 0.9
+
+    # Minimum distance penalty applied during matching.
     minimum_distance_penalty: 0.5
+
+    # Expands acceptable responses around good matches.
     use_response_expansion: true

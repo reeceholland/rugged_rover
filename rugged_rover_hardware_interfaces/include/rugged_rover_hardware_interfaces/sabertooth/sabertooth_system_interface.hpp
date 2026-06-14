@@ -3,9 +3,11 @@
 #ifndef RUGGED_ROVER_HARDWARE_INTERFACES_SABERTOOTH_SYSTEM_INTERFACE_HPP
 #define RUGGED_ROVER_HARDWARE_INTERFACES_SABERTOOTH_SYSTEM_INTERFACE_HPP
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "hardware_interface/system_interface.hpp"
@@ -71,9 +73,13 @@ namespace rugged_rover_hardware_interfaces::sabertooth
     double feedback_timeout_seconds_ = 0.25;
     bool use_reliable_command_qos_ = false;
     rclcpp::Time last_command_publish_time_;
-    double command_publish_period_seconds_ = 0.05;
+    double command_publish_period_seconds_ = 0.02;
     std::mutex feedback_mutex_;
     std::atomic<bool> battery_allows_motion_ = true;
+
+    rclcpp::executors::SingleThreadedExecutor::SharedPtr executor_;
+    std::thread executor_thread_;
+    std::atomic<bool> executor_running_ = false;
 
     friend class SabertoothInterfaceTest;
   };

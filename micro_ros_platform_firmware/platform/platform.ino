@@ -135,11 +135,12 @@ void loop()
     {
       publish_joint_state_message();
       publish_battery_voltage_message();
+      publish_debug_message();
     }
     update_motors();
   }
 
-  if (USE_ROS)
+  if (USE_ROS && ROS_SERIAL_STATUS_DEBUG)
   {
     static unsigned long last_debug_ms = 0;
     if (now - last_debug_ms >= 1000)
