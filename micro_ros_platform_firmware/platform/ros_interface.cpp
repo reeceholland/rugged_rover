@@ -135,16 +135,16 @@ namespace
     }
     debug_publisher_created = true;
 
-    if (rcl_subscription_init(&joint_state_subscriber, &node, type_support,
-                              "platform/motors/cmd", &sub_ops) != RCL_RET_OK)
+    if (rcl_subscription_init(&joint_state_subscriber, &node, type_support, "platform/motors/cmd",
+                              &sub_ops) != RCL_RET_OK)
     {
       destroy_ros_entities();
       return false;
     }
     motor_subscription_created = true;
 
-    if (rcl_publisher_init(&feedback_publisher, &node, type_support,
-                           "platform/motors/feedback", &pub_ops) != RCL_RET_OK)
+    if (rcl_publisher_init(&feedback_publisher, &node, type_support, "platform/motors/feedback",
+                           &pub_ops) != RCL_RET_OK)
     {
       destroy_ros_entities();
       return false;
@@ -305,5 +305,8 @@ void spin_ros_executor()
 void ros_setup() {}
 void ros_update() {}
 void spin_ros_executor() {}
-bool ros_is_connected() { return false; }
+bool ros_is_connected()
+{
+  return false;
+}
 #endif

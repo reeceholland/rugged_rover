@@ -47,7 +47,7 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   const bool is_feedback_msg = (&msg == &feedback_msg);
 
   rosidl_runtime_c__String* names = is_feedback_msg ? feedback_name_data : cmd_name_data;
-  char (*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
+  char(*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
   double* positions = is_feedback_msg ? feedback_position_data : cmd_position_data;
   double* velocities = is_feedback_msg ? feedback_velocity_data : cmd_velocity_data;
 
