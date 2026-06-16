@@ -1,3 +1,17 @@
+// Copyright 2026 Reece Holland
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "msg_utils.hpp"
 #include "battery_monitor.hpp"
 #include "battery_safety.hpp"
@@ -25,12 +39,12 @@ char debug_message_buffer[DEBUG_MESSAGE_LEN];
 namespace
 {
 
-  const char* const JOINT_NAMES[MAX_JOINTS] = {
-      "front_left_joint",
-      "front_right_joint",
-      "rear_left_joint",
-      "rear_right_joint",
-  };
+const char * const JOINT_NAMES[MAX_JOINTS] = {
+  "front_left_joint",
+  "front_right_joint",
+  "rear_left_joint",
+  "rear_right_joint",
+};
 
 } // namespace
 
@@ -42,14 +56,14 @@ namespace
  *
  * @param msg The JointState message to initialize.
  */
-void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
+void initialise_joint_state_message(sensor_msgs__msg__JointState & msg)
 {
   const bool is_feedback_msg = (&msg == &feedback_msg);
 
-  rosidl_runtime_c__String* names = is_feedback_msg ? feedback_name_data : cmd_name_data;
+  rosidl_runtime_c__String * names = is_feedback_msg ? feedback_name_data : cmd_name_data;
   char(*name_storage)[MAX_NAME_LEN] = is_feedback_msg ? feedback_name_buffer : cmd_name_buffer;
-  double* positions = is_feedback_msg ? feedback_position_data : cmd_position_data;
-  double* velocities = is_feedback_msg ? feedback_velocity_data : cmd_velocity_data;
+  double * positions = is_feedback_msg ? feedback_position_data : cmd_position_data;
+  double * velocities = is_feedback_msg ? feedback_velocity_data : cmd_velocity_data;
 
   msg.name.data = names;
   msg.name.size = 4;
@@ -67,8 +81,7 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   msg.effort.size = 0;
   msg.effort.capacity = 0;
 
-  for (size_t i = 0; i < MAX_JOINTS; ++i)
-  {
+  for (size_t i = 0; i < MAX_JOINTS; ++i) {
     strncpy(name_storage[i], JOINT_NAMES[i], MAX_NAME_LEN - 1);
     name_storage[i][MAX_NAME_LEN - 1] = '\0';
     names[i].data = name_storage[i];
@@ -79,12 +92,12 @@ void initialise_joint_state_message(sensor_msgs__msg__JointState& msg)
   }
 }
 
-void initialise_battery_voltage_message(std_msgs__msg__Float32& msg)
+void initialise_battery_voltage_message(std_msgs__msg__Float32 & msg)
 {
   msg.data = 0.0f;
 }
 
-void initialise_debug_message(std_msgs__msg__String& msg)
+void initialise_debug_message(std_msgs__msg__String & msg)
 {
   debug_message_buffer[0] = '\0';
   msg.data.data = debug_message_buffer;
@@ -97,8 +110,7 @@ void publish_battery_voltage_message()
   static unsigned long last_publish_ms = 0;
   unsigned long now = millis();
 
-  if (now - last_publish_ms < BATTERY_PUBLISH_PERIOD_MS)
-  {
+  if (now - last_publish_ms < BATTERY_PUBLISH_PERIOD_MS) {
     return;
   }
 
@@ -113,15 +125,14 @@ void publish_debug_message()
   static unsigned long last_publish_ms = 0;
   const unsigned long now = millis();
 
-  if (now - last_publish_ms < DEBUG_PUBLISH_PERIOD_MS)
-  {
+  if (now - last_publish_ms < DEBUG_PUBLISH_PERIOD_MS) {
     return;
   }
 
   last_publish_ms = now;
 
   const long last_cmd_age_ms =
-      last_motor_command_ms == 0 ? -1 : static_cast<long>(now - last_motor_command_ms);
+    last_motor_command_ms == 0 ? -1 : static_cast<long>(now - last_motor_command_ms);
 
   const int written = snprintf(
       debug_message_buffer, DEBUG_MESSAGE_LEN,
@@ -133,14 +144,13 @@ void publish_debug_message()
       front_right_velocity_setpoint, current_front_left_rads_sec, current_front_right_rads_sec,
       front_left_output, front_right_output);
 
-  if (written < 0)
-  {
+  if (written < 0) {
     return;
   }
 
   debug_message_buffer[DEBUG_MESSAGE_LEN - 1] = '\0';
   debug_msg.data.size =
-      written >= DEBUG_MESSAGE_LEN ? DEBUG_MESSAGE_LEN - 1 : static_cast<size_t>(written);
+    written >= DEBUG_MESSAGE_LEN ? DEBUG_MESSAGE_LEN - 1 : static_cast<size_t>(written);
 
   RCSOFTCHECK(rcl_publish(&debug_publisher, &debug_msg, NULL));
 }
@@ -176,57 +186,45 @@ void publish_joint_state_message()
  *
  * @param msgin Pointer to the incoming JointState message.
  */
-void subscription_callback(const void* msgin)
+void subscription_callback(const void * msgin)
 {
-  if (battery_is_critical())
-  {
+  if (battery_is_critical()) {
     stop_motors();
     return;
   }
   //  Cast the incoming message to the expected type
-  const sensor_msgs__msg__JointState* joint_msg = (const sensor_msgs__msg__JointState*) msgin;
+  const sensor_msgs__msg__JointState * joint_msg = (const sensor_msgs__msg__JointState *) msgin;
   bool received_motor_command = false;
 
   //  For each joint in the message, check the name and update the corresponding
   //  velocity setpoint
-  for (size_t i = 0; i < joint_msg->name.size && i < MAX_JOINTS; i++)
-  {
-    if (i >= joint_msg->velocity.size)
-    {
+  for (size_t i = 0; i < joint_msg->name.size && i < MAX_JOINTS; i++) {
+    if (i >= joint_msg->velocity.size) {
       break;
     }
 
-    const char* name = joint_msg->name.data[i].data;
+    const char * name = joint_msg->name.data[i].data;
     float velocity = joint_msg->velocity.data[i];
-    if (strcmp(name, "front_left_joint") == 0)
-    {
+    if (strcmp(name, "front_left_joint") == 0) {
       front_left_velocity_setpoint = velocity;
       received_motor_command = true;
-    }
-    else if (strcmp(name, "front_right_joint") == 0)
-    {
+    } else if (strcmp(name, "front_right_joint") == 0) {
       front_right_velocity_setpoint = velocity;
       received_motor_command = true;
-    }
-    else if (strcmp(name, "rear_left_joint") == 0)
-    {
+    } else if (strcmp(name, "rear_left_joint") == 0) {
       front_left_velocity_setpoint = velocity;
       received_motor_command = true;
-    }
-    else if (strcmp(name, "rear_right_joint") == 0)
-    {
+    } else if (strcmp(name, "rear_right_joint") == 0) {
       front_right_velocity_setpoint = velocity;
       received_motor_command = true;
     }
   }
 
-  if (received_motor_command)
-  {
+  if (received_motor_command) {
     mark_motor_command_received();
   }
 
-  if (abs(front_left_velocity_setpoint) <= 0.05 && abs(front_right_velocity_setpoint) <= 0.05)
-  {
+  if (abs(front_left_velocity_setpoint) <= 0.05 && abs(front_right_velocity_setpoint) <= 0.05) {
     stop_motors();
   }
 }

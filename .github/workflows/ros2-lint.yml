@@ -1,0 +1,48 @@
+name: ROS 2 Lint
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  ros2-lint:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up ROS 2
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+
+      - name: Install ROS 2 lint tools
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            ros-jazzy-ament-copyright \
+            ros-jazzy-ament-uncrustify
+
+      - name: Run ROS 2 format and copyright checks
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+
+          OWNED_PATHS=(
+            micro_ros_platform_firmware/platform
+            rugged_rover_battery
+            rugged_rover_bringup
+            rugged_rover_control
+            rugged_rover_hardware_interfaces
+            rugged_rover_interfaces
+            rugged_rover_robot_description
+            rugged_rover_test
+          )
+
+          ament_uncrustify "${OWNED_PATHS[@]}"
+          ament_copyright "${OWNED_PATHS[@]}"

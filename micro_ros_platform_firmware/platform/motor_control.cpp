@@ -1,3 +1,17 @@
+// Copyright 2026 Reece Holland
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "motor_control.hpp"
 #include "battery_safety.hpp"
 #include "config.hpp"
@@ -5,21 +19,20 @@
 namespace
 {
 
-  constexpr int LEFT_FEEDFORWARD_COMMAND = 10;
-  constexpr int RIGHT_FEEDFORWARD_COMMAND = 13;
-  constexpr float SETPOINT_DEADBAND_RAD_S = 0.05;
+constexpr int LEFT_FEEDFORWARD_COMMAND = 10;
+constexpr int RIGHT_FEEDFORWARD_COMMAND = 13;
+constexpr float SETPOINT_DEADBAND_RAD_S = 0.05;
 
-  int command_with_feedforward(float pid_output, float setpoint, int feedforward_command)
-  {
-    if (abs(setpoint) <= SETPOINT_DEADBAND_RAD_S)
-    {
-      return 0;
-    }
-
-    const float feedforward = setpoint > 0.0 ? feedforward_command : -feedforward_command;
-
-    return static_cast<int>(pid_output + feedforward);
+int command_with_feedforward(float pid_output, float setpoint, int feedforward_command)
+{
+  if (abs(setpoint) <= SETPOINT_DEADBAND_RAD_S) {
+    return 0;
   }
+
+  const float feedforward = setpoint > 0.0 ? feedforward_command : -feedforward_command;
+
+  return static_cast<int>(pid_output + feedforward);
+}
 
 } // namespace
 
@@ -34,9 +47,9 @@ unsigned long last_motor_command_ms = 0;
 
 //  The PID controller for the front left motor
 QuickPID front_left_pid(&current_front_left_rads_sec, &front_left_output,
-                        &front_left_velocity_setpoint);
+  &front_left_velocity_setpoint);
 QuickPID front_right_pid(&current_front_right_rads_sec, &front_right_output,
-                         &front_right_velocity_setpoint);
+  &front_right_velocity_setpoint);
 
 /**
  * @brief Function to setup the PID controllers
@@ -84,7 +97,7 @@ void stop_motors()
  * @param motor The motor number (1 or 2).
  * @param speed The speed value to set for the motor (-127 to 127).
  */
-void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int speed)
+void send_sabertooth_command(HardwareSerial & port, byte address, byte motor, int speed)
 {
 
   //  Constrain the speed to the valid range
@@ -111,19 +124,18 @@ void send_sabertooth_command(HardwareSerial& port, byte address, byte motor, int
  */
 void update_motors()
 {
-  if (battery_is_critical())
-  {
+  if (battery_is_critical()) {
     stop_motors();
     return;
   }
   if (USE_ROS &&
-      (last_motor_command_ms == 0 || millis() - last_motor_command_ms > MOTOR_COMMAND_TIMEOUT_MS))
+    (last_motor_command_ms == 0 || millis() - last_motor_command_ms > MOTOR_COMMAND_TIMEOUT_MS))
   {
     stop_motors();
     return;
   }
   if (abs(front_left_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S &&
-      abs(front_right_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S)
+    abs(front_right_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S)
   {
     stop_motors();
     return;
@@ -133,8 +145,7 @@ void update_motors()
   front_left_pid.Compute();
   front_right_pid.Compute();
 
-  if (SERIAL_DEBUG)
-  {
+  if (SERIAL_DEBUG) {
     Serial.print("FL setpoint: ");
     Serial.print(front_left_velocity_setpoint);
     Serial.print(" measured: ");
@@ -154,8 +165,7 @@ void update_motors()
   const int front_right_command = -command_with_feedforward(
       front_right_output, front_right_velocity_setpoint, RIGHT_FEEDFORWARD_COMMAND);
 
-  if (SERIAL_DEBUG)
-  {
+  if (SERIAL_DEBUG) {
     Serial.print(" commands: FL=");
     Serial.print(front_left_command);
     Serial.print(" FR=");

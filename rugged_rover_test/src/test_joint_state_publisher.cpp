@@ -1,3 +1,17 @@
+// Copyright 2026 Reece Holland
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 
@@ -11,7 +25,7 @@
  * @param argv Array of command line arguments.
  * @return int Exit status.
  */
-int main(int argc, char* argv[])
+int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
 
@@ -22,24 +36,18 @@ int main(int argc, char* argv[])
   double right_velocity = 1.5;
 
   // Parse command-line arguments if provided
-  if (argc >= 3)
-  {
-    try
-    {
+  if (argc >= 3) {
+    try {
       left_velocity = std::stod(argv[1]);
       right_velocity = std::stod(argv[2]);
-    }
-    catch (const std::exception& e)
-    {
+    } catch (const std::exception & e) {
       RCLCPP_ERROR(node->get_logger(), "Invalid arguments: %s", e.what());
       RCLCPP_INFO(node->get_logger(), "Usage: ros2 run rugged_rover_test send_joint_command "
                                       "<left_velocity> <right_velocity>");
       rclcpp::shutdown();
       return 1;
     }
-  }
-  else
-  {
+  } else {
     RCLCPP_WARN(node->get_logger(), "No command line arguments provided, using defaults.");
     RCLCPP_INFO(node->get_logger(), "Default velocities: left=%.2f, right=%.2f", left_velocity,
                 right_velocity);
@@ -52,8 +60,7 @@ int main(int argc, char* argv[])
                                                                         rclcpp::SensorDataQoS());
   rclcpp::WallRate loop_rate(1); // 1 Hz
 
-  while (rclcpp::ok())
-  {
+  while (rclcpp::ok()) {
     sensor_msgs::msg::JointState msg;
     msg.header.stamp = node->now();
     msg.name = {"left_front_wheel_joint", "right_front_wheel_joint"};

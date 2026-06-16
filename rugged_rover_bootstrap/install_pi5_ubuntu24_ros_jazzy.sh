@@ -15,7 +15,7 @@ ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/rugged_rover_ws}"
 REPO_DIR="${REPO_DIR:-$WORKSPACE_DIR/src/rugged_rover}"
 REPO_URL="${REPO_URL:-git@github.com:reeceholland/rugged_rover.git}"
-REPO_BRANCH="${REPO_BRANCH:-support-unity-sim}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
 GIT_USER_NAME="${GIT_USER_NAME:-Reece Holland}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-reece.j.holland@gmail.com}"
 
@@ -140,6 +140,8 @@ install_ros_packages() {
     python3-rosdep \
     python3-vcstool \
     ros-dev-tools \
+    "ros-${ROS_DISTRO}-ament-copyright" \
+    "ros-${ROS_DISTRO}-ament-uncrustify" \
     "ros-${ROS_DISTRO}-controller-manager" \
     "ros-${ROS_DISTRO}-depthimage-to-laserscan" \
     "ros-${ROS_DISTRO}-diagnostic-updater" \
