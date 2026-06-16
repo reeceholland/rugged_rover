@@ -66,7 +66,7 @@ testing.
 Start from Ubuntu Server 24.04 on the Raspberry Pi 5. SSH into the Pi, then run:
 
 ```bash
-git clone --branch support-unity-sim git@github.com:reeceholland/rugged_rover.git ~/rugged_rover_bootstrap
+git clone --branch main git@github.com:reeceholland/rugged_rover.git ~/rugged_rover_bootstrap
 cd ~/rugged_rover_bootstrap
 bash rugged_rover_bootstrap/install_pi5_ubuntu24_ros_jazzy.sh
 ```
@@ -75,7 +75,7 @@ The installer:
 
 - repairs the Ubuntu noble-updates apt source if it is missing
 - installs bzip2/libbz2 after the apt source repair
-- installs ROS 2 Jazzy and rover dependencies
+- installs ROS 2 Jazzy, rover dependencies, and ROS lint tools
 - configures the ROS apt repository
 - configures rosdep
 - clones this repository into ~/rugged_rover_ws/src/rugged_rover
@@ -115,7 +115,7 @@ If you do not use the Pi installer:
 ```bash
 mkdir -p ~/rugged_rover_ws/src
 cd ~/rugged_rover_ws/src
-git clone --branch support-unity-sim git@github.com:reeceholland/rugged_rover.git
+git clone --branch main git@github.com:reeceholland/rugged_rover.git
 cd rugged_rover
 git submodule update --init --recursive
 
@@ -137,7 +137,7 @@ source install/setup.bash
 
 ## Formatting and Linting
 
-This repository uses the ROS 2 lint tools rather than raw `clang-format`:
+This repository uses the ROS 2 lint tools for formatting and license checks:
 
 ```bash
 cd ~/rugged_rover_ws/src/rugged_rover
@@ -146,7 +146,11 @@ source /opt/ros/jazzy/setup.bash
 ament_uncrustify \
   micro_ros_platform_firmware/platform \
   rugged_rover_battery \
+  rugged_rover_bringup \
+  rugged_rover_control \
   rugged_rover_hardware_interfaces \
+  rugged_rover_interfaces \
+  rugged_rover_robot_description \
   rugged_rover_test
 
 ament_copyright \
@@ -166,7 +170,11 @@ To reformat C/C++ files in place:
 ament_uncrustify --reformat \
   micro_ros_platform_firmware/platform \
   rugged_rover_battery \
+  rugged_rover_bringup \
+  rugged_rover_control \
   rugged_rover_hardware_interfaces \
+  rugged_rover_interfaces \
+  rugged_rover_robot_description \
   rugged_rover_test
 ```
 
@@ -391,7 +399,7 @@ ros2 topic echo /map --once
 
 ## Manual Driving
 
-The diff drive controller currently accepts `TwistStamped`:
+The diff drive controller accepts `TwistStamped` commands:
 
 ```bash
 ros2 topic info /diff_drive_controller/cmd_vel -v
@@ -518,8 +526,11 @@ while tuning odometry and scan matching.
 Launch Nav2 after bringup is healthy:
 
 ```bash
-ros2 launch rugged_rover_bringup nav2.launch.py
+ros2 launch rugged_rover_bringup nav2.launch.py use_sim_time:=false
 ```
+
+The Nav2 launch file defaults to Unity/simulation time. Always pass
+`use_sim_time:=false` on the physical rover.
 
 Before sending goals, confirm:
 
@@ -643,11 +654,14 @@ ros2 launch rugged_rover_bringup unity_sim.launch.py
 
 Then press Play in Unity.
 
-The Unity simulation normally uses:
+The ROS TCP endpoint binds to `0.0.0.0:10000` by default so Unity can run
+on the same machine or another laptop. In Unity, set the ROS TCP Connector
+address to the ROS machine's IP address and port `10000`.
 
-```text
-ROS_IP=127.0.0.1
-ROS_TCP_PORT=10000
+For local-only testing, bind the endpoint to localhost:
+
+```bash
+ros2 launch rugged_rover_bringup unity_sim.launch.py ros_tcp_ip:=127.0.0.1
 ```
 
 When testing fault injection, some Unity topics may be remapped with a `_raw`
@@ -656,6 +670,31 @@ postfix. Make sure SLAM subscribes to the topic that Unity is actually publishin
 ```bash
 ros2 topic info /scan -v
 ros2 topic info /scan_raw -v
+```
+
+## Remote ROS 2 Tools from WSL
+
+WSL2 can see the Pi over normal IP networking, but DDS discovery may not work
+reliably unless both machines can exchange multicast traffic. If `ping` works
+but WSL shows no rover topics, use one of these approaches:
+
+- run RViz and ROS CLI tools directly on the ROS laptop/Pi network
+- enable WSL mirrored networking on Windows 11
+- use a Fast DDS discovery server and set the same `ROS_DISCOVERY_SERVER` on
+  the Pi and WSL
+
+Example discovery-server environment:
+
+```bash
+export ROS_DOMAIN_ID=0
+export ROS_LOCALHOST_ONLY=0
+export ROS_DISCOVERY_SERVER=<pi-or-ros-laptop-ip>:11811
+```
+
+Then restart the ROS nodes and use:
+
+```bash
+ros2 topic list --no-daemon
 ```
 
 ## Common Troubleshooting
@@ -732,7 +771,15 @@ ros2 daemon start
 Format C++ files:
 
 ```bash
-find . \( -name "*.cpp" -o -name "*.hpp" \) -exec clang-format -i {} +
+ament_uncrustify --reformat \
+  micro_ros_platform_firmware/platform \
+  rugged_rover_battery \
+  rugged_rover_bringup \
+  rugged_rover_control \
+  rugged_rover_hardware_interfaces \
+  rugged_rover_interfaces \
+  rugged_rover_robot_description \
+  rugged_rover_test
 ```
 
 Build the main stack:
