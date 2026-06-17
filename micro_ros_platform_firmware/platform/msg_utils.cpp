@@ -137,12 +137,12 @@ void publish_debug_message()
   const int written = snprintf(
       debug_message_buffer, DEBUG_MESSAGE_LEN,
       "ros=%s battery_critical=%s battery_v=%.2f last_cmd_age_ms=%ld "
-      "setpoints_fl=%.3f setpoints_fr=%.3f measured_fl=%.3f measured_fr=%.3f "
-      "output_fl=%.2f output_fr=%.2f",
+      "setpoints_rl=%.3f setpoints_rr=%.3f measured_rl=%.3f measured_rr=%.3f "
+      "output_rl=%.2f output_rr=%.2f",
       ros_is_connected() ? "connected" : "waiting", battery_is_critical() ? "true" : "false",
-      read_battery_voltage(), last_cmd_age_ms, front_left_velocity_setpoint,
-      front_right_velocity_setpoint, current_front_left_rads_sec, current_front_right_rads_sec,
-      front_left_output, front_right_output);
+      read_battery_voltage(), last_cmd_age_ms, rear_left_velocity_setpoint,
+      rear_right_velocity_setpoint, current_rear_left_rads_sec, current_rear_right_rads_sec,
+      rear_left_output, rear_right_output);
 
   if (written < 0) {
     return;
@@ -159,20 +159,20 @@ void publish_debug_message()
  * @brief Publish the JointState message with current velocity data.
  *
  * This function updates the velocity data in the JointState message with the
- * current velocities of the front left and front right motors, then publishes
+ * current velocities of the rear left and rear right motors, then publishes
  * the message.
  */
 void publish_joint_state_message()
 {
-  feedback_msg.position.data[0] = current_front_left_position_rad;
-  feedback_msg.position.data[1] = current_front_right_position_rad;
-  feedback_msg.position.data[2] = current_front_left_position_rad;
-  feedback_msg.position.data[3] = current_front_right_position_rad;
+  feedback_msg.position.data[0] = current_rear_left_position_rad;
+  feedback_msg.position.data[1] = current_rear_right_position_rad;
+  feedback_msg.position.data[2] = current_rear_left_position_rad;
+  feedback_msg.position.data[3] = current_rear_right_position_rad;
 
-  feedback_msg.velocity.data[0] = current_front_left_rads_sec;
-  feedback_msg.velocity.data[1] = current_front_right_rads_sec;
-  feedback_msg.velocity.data[2] = current_front_left_rads_sec;
-  feedback_msg.velocity.data[3] = current_front_right_rads_sec;
+  feedback_msg.velocity.data[0] = current_rear_left_rads_sec;
+  feedback_msg.velocity.data[1] = current_rear_right_rads_sec;
+  feedback_msg.velocity.data[2] = current_rear_left_rads_sec;
+  feedback_msg.velocity.data[3] = current_rear_right_rads_sec;
   RCSOFTCHECK(rcl_publish(&feedback_publisher, &feedback_msg, NULL));
 }
 
@@ -181,7 +181,7 @@ void publish_joint_state_message()
  *
  * This function processes incoming JointState messages, extracting the joint
  * names and their corresponding velocity setpoints. It updates the global
- * velocity setpoints for the front left and front right motors based on the
+ * velocity setpoints for the rear left and rear right motors based on the
  * received message.
  *
  * @param msgin Pointer to the incoming JointState message.
@@ -206,16 +206,16 @@ void subscription_callback(const void * msgin)
     const char * name = joint_msg->name.data[i].data;
     float velocity = joint_msg->velocity.data[i];
     if (strcmp(name, "front_left_joint") == 0) {
-      front_left_velocity_setpoint = velocity;
+      rear_left_velocity_setpoint = velocity;
       received_motor_command = true;
     } else if (strcmp(name, "front_right_joint") == 0) {
-      front_right_velocity_setpoint = velocity;
+      rear_right_velocity_setpoint = velocity;
       received_motor_command = true;
     } else if (strcmp(name, "rear_left_joint") == 0) {
-      front_left_velocity_setpoint = velocity;
+      rear_left_velocity_setpoint = velocity;
       received_motor_command = true;
     } else if (strcmp(name, "rear_right_joint") == 0) {
-      front_right_velocity_setpoint = velocity;
+      rear_right_velocity_setpoint = velocity;
       received_motor_command = true;
     }
   }
@@ -224,7 +224,7 @@ void subscription_callback(const void * msgin)
     mark_motor_command_received();
   }
 
-  if (abs(front_left_velocity_setpoint) <= 0.05 && abs(front_right_velocity_setpoint) <= 0.05) {
+  if (abs(rear_left_velocity_setpoint) <= 0.05 && abs(rear_right_velocity_setpoint) <= 0.05) {
     stop_motors();
   }
 }
