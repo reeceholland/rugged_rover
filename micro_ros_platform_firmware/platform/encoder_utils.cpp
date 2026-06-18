@@ -23,16 +23,16 @@ constexpr float VELOCITY_FILTER_ALPHA = 0.35;
 
 } // namespace
 
-//  Encoder instances for front left and front right motors
-Encoder frontLeftEncoder(2, 3);
-Encoder frontRightEncoder(4, 5);
+//  Encoder instances for rear left and rear right motors
+Encoder rearLeftEncoder(2, 3);
+Encoder rearRightEncoder(4, 5);
 
-volatile long frontLeftLastTicks = 0;
-volatile long frontRightLastTicks = 0;
-float current_front_left_position_rad = 0;
-float current_front_right_position_rad = 0;
-float current_front_left_rads_sec = 0;
-float current_front_right_rads_sec = 0;
+volatile long rearLeftLastTicks = 0;
+volatile long rearRightLastTicks = 0;
+float current_rear_left_position_rad = 0;
+float current_rear_right_position_rad = 0;
+float current_rear_left_rads_sec = 0;
+float current_rear_right_rads_sec = 0;
 unsigned long lastEncoderSampleTime = 0;
 
 /**
@@ -53,38 +53,38 @@ void sample_encoders()
   }
 
   //  Read the current encoder values
-  long currentFL = frontLeftEncoder.read();
-  long currentFR = frontRightEncoder.read();
+  long currentRL = rearLeftEncoder.read();
+  long currentRR = rearRightEncoder.read();
 
-  current_front_left_position_rad =
-    (currentFL / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI * -1;
-  current_front_right_position_rad =
-    (currentFR / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI;
+  current_rear_left_position_rad =
+    (currentRL / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI * -1;
+  current_rear_right_position_rad =
+    (currentRR / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI;
 
   //  Calculate the change in ticks since the last sample
-  long deltaFL = currentFL - frontLeftLastTicks;
-  long deltaFR = currentFR - frontRightLastTicks;
+  long deltaRL = currentRL - rearLeftLastTicks;
+  long deltaRR = currentRR - rearRightLastTicks;
 
   //  Calculate the speed in ticks per second
-  float flTicksSec = deltaFL / (deltaTimeMs / 1000.0);
-  float frTicksSec = deltaFR / (deltaTimeMs / 1000.0);
+  float rlTicksSec = deltaRL / (deltaTimeMs / 1000.0);
+  float rrTicksSec = deltaRR / (deltaTimeMs / 1000.0);
 
   //  Convert ticks per second to radians per second
   //  The gear ratio multiplier is used to adjust the ticks based on the gear
   //  ratio of the motors
-  const float raw_front_left_rads_sec =
-    (flTicksSec / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI * -1;
-  const float raw_front_right_rads_sec =
-    (frTicksSec / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI;
+  const float raw_rear_left_rads_sec =
+    (rlTicksSec / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI * -1;
+  const float raw_rear_right_rads_sec =
+    (rrTicksSec / (ENCODER_COUNTS_PER_MOTOR_REV * GEAR_RATIO_MULTIPLIER)) * TWO_PI;
 
-  current_front_left_rads_sec +=
-    VELOCITY_FILTER_ALPHA * (raw_front_left_rads_sec - current_front_left_rads_sec);
-  current_front_right_rads_sec +=
-    VELOCITY_FILTER_ALPHA * (raw_front_right_rads_sec - current_front_right_rads_sec);
+  current_rear_left_rads_sec +=
+    VELOCITY_FILTER_ALPHA * (raw_rear_left_rads_sec - current_rear_left_rads_sec);
+  current_rear_right_rads_sec +=
+    VELOCITY_FILTER_ALPHA * (raw_rear_right_rads_sec - current_rear_right_rads_sec);
 
   //  Update the last ticks for the next sample
-  frontLeftLastTicks = currentFL;
-  frontRightLastTicks = currentFR;
+  rearLeftLastTicks = currentRL;
+  rearRightLastTicks = currentRR;
 
   //  Update the last sample time
   lastEncoderSampleTime = now;
@@ -92,15 +92,15 @@ void sample_encoders()
   if (SERIAL_DEBUG) {
     Serial.print("dt: ");
     Serial.print(deltaTimeMs);
-    Serial.print(" ms, deltaFL: ");
-    Serial.print(deltaFL);
-    Serial.print(", deltaFR: ");
-    Serial.print(deltaFR);
+    Serial.print(" ms, deltaRL: ");
+    Serial.print(deltaRL);
+    Serial.print(", deltaRR: ");
+    Serial.print(deltaRR);
     Serial.print(" | ");
-    Serial.print("FL: ");
-    Serial.print(current_front_left_rads_sec);
-    Serial.print(" rad/s, FR: ");
-    Serial.print(current_front_right_rads_sec);
+    Serial.print("RL: ");
+    Serial.print(current_rear_left_rads_sec);
+    Serial.print(" rad/s, RR: ");
+    Serial.print(current_rear_right_rads_sec);
     Serial.println(" rad/s");
   }
 }

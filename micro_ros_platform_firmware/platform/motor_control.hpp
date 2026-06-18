@@ -27,17 +27,17 @@ constexpr float ENCODER_COUNTS_PER_MOTOR_REV = 48.0;
 constexpr float GEAR_RATIO_MULTIPLIER = 51.0;
 
 // Control variables
-extern float front_left_velocity_setpoint;
-extern float front_right_velocity_setpoint;
-extern float front_left_output;
-extern float front_right_output;
+extern float rear_left_velocity_setpoint;
+extern float rear_right_velocity_setpoint;
+extern float rear_left_output;
+extern float rear_right_output;
 extern unsigned long last_motor_command_ms;
-extern QuickPID front_left_pid;
-extern QuickPID front_right_pid;
+extern QuickPID rear_left_pid;
+extern QuickPID rear_right_pid;
 
 // ROS-shared velocity measurements
-extern float current_front_left_rads_sec;
-extern float current_front_right_rads_sec;
+extern float current_rear_left_rads_sec;
+extern float current_rear_right_rads_sec;
 
 void setup_pid();
 void mark_motor_command_received();
