@@ -71,14 +71,14 @@ namespace
       return;
     }
 
-    rear_left_velocity_setpoint = left;
-    rear_right_velocity_setpoint = right;
+    left_side_velocity_setpoint = left;
+    right_side_velocity_setpoint = right;
     mark_motor_command_received();
 
     Serial.print("Setpoints: left=");
-    Serial.print(rear_left_velocity_setpoint, 3);
+    Serial.print(left_side_velocity_setpoint, 3);
     Serial.print(" rad/s, right=");
-    Serial.print(rear_right_velocity_setpoint, 3);
+    Serial.print(right_side_velocity_setpoint, 3);
     Serial.println(" rad/s");
   }
 
@@ -152,10 +152,10 @@ void loop()
       Serial.print(battery_is_critical() ? "true" : "false");
       Serial.print(" last_cmd_age_ms=");
       Serial.print(last_motor_command_ms == 0 ? -1 : static_cast<long>(now - last_motor_command_ms));
-      Serial.print(" setpoints RL=");
-      Serial.print(rear_left_velocity_setpoint, 3);
-      Serial.print(" RR=");
-      Serial.println(rear_right_velocity_setpoint, 3);
+      Serial.print(" setpoints left=");
+      Serial.print(left_side_velocity_setpoint, 3);
+      Serial.print(" right=");
+      Serial.println(right_side_velocity_setpoint, 3);
     }
   }
 

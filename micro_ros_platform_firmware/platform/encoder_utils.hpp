@@ -16,12 +16,12 @@
 
 #include <Encoder.h>
 
-extern volatile long rearLeftLastTicks;
-extern volatile long rearRightLastTicks;
-extern float current_rear_left_position_rad;
-extern float current_rear_right_position_rad;
-extern float current_rear_left_rads_sec;
-extern float current_rear_right_rads_sec;
+extern volatile long leftSideLastTicks;
+extern volatile long rightSideLastTicks;
+extern float current_left_side_position_rad;
+extern float current_right_side_position_rad;
+extern float current_left_side_rads_sec;
+extern float current_right_side_rads_sec;
 extern unsigned long lastEncoderSampleTime;
 
 //  Sample the encoders and calculate the current speed in radians per second.
