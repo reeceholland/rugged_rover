@@ -22,6 +22,7 @@ namespace
 constexpr int LEFT_FEEDFORWARD_COMMAND = 22;
 constexpr int RIGHT_FEEDFORWARD_COMMAND = 25;
 constexpr float SETPOINT_DEADBAND_RAD_S = 0.05;
+constexpr int DEBUG_MAX_MOTOR_COMMAND = 60;
 
 int command_with_feedforward(float pid_output, float setpoint, int feedforward_command)
 {
@@ -37,36 +38,36 @@ int command_with_feedforward(float pid_output, float setpoint, int feedforward_c
 } // namespace
 
 //  Motor velocity setpoints
-float rear_left_velocity_setpoint = 0;
-float rear_right_velocity_setpoint = 0;
+float left_side_velocity_setpoint = 0;
+float right_side_velocity_setpoint = 0;
 
 //  PID outputs
-float rear_left_output = 0;
-float rear_right_output = 0;
+float left_side_output = 0;
+float right_side_output = 0;
 unsigned long last_motor_command_ms = 0;
 
-//  The PID controller for the rear left motor
-QuickPID rear_left_pid(&current_rear_left_rads_sec, &rear_left_output,
-  &rear_left_velocity_setpoint);
-QuickPID rear_right_pid(&current_rear_right_rads_sec, &rear_right_output,
-  &rear_right_velocity_setpoint);
+//  PID controllers for the left and right drivetrain sides
+QuickPID left_side_pid(&current_left_side_rads_sec, &left_side_output,
+  &left_side_velocity_setpoint);
+QuickPID right_side_pid(&current_right_side_rads_sec, &right_side_output,
+  &right_side_velocity_setpoint);
 
 /**
  * @brief Function to setup the PID controllers
  */
 void setup_pid()
 {
-  rear_left_pid.SetOutputLimits(-127.0, 127.0);
-  rear_right_pid.SetOutputLimits(-127.0, 127.0);
+  left_side_pid.SetOutputLimits(-127.0, 127.0);
+  right_side_pid.SetOutputLimits(-127.0, 127.0);
 
-  rear_left_pid.SetTunings(8.0, 0.7, 0.00);
-  rear_right_pid.SetTunings(8.0, 0.7, 0.00);
+  left_side_pid.SetTunings(8.0, 0.7, 0.00);
+  right_side_pid.SetTunings(8.0, 0.7, 0.00);
 
-  rear_left_pid.SetSampleTimeUs(50000);
-  rear_right_pid.SetSampleTimeUs(50000);
+  left_side_pid.SetSampleTimeUs(50000);
+  right_side_pid.SetSampleTimeUs(50000);
 
-  rear_left_pid.SetMode(QuickPID::Control::automatic);
-  rear_right_pid.SetMode(QuickPID::Control::automatic);
+  left_side_pid.SetMode(QuickPID::Control::automatic);
+  right_side_pid.SetMode(QuickPID::Control::automatic);
 }
 
 void mark_motor_command_received()
@@ -76,12 +77,12 @@ void mark_motor_command_received()
 
 void stop_motors()
 {
-  rear_left_velocity_setpoint = 0.0;
-  rear_right_velocity_setpoint = 0.0;
-  rear_left_output = 0.0;
-  rear_right_output = 0.0;
-  rear_left_pid.Reset();
-  rear_right_pid.Reset();
+  left_side_velocity_setpoint = 0.0;
+  right_side_velocity_setpoint = 0.0;
+  left_side_output = 0.0;
+  right_side_output = 0.0;
+  left_side_pid.Reset();
+  right_side_pid.Reset();
   send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1, 0);
   send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 2, 0);
 }
@@ -134,44 +135,48 @@ void update_motors()
     stop_motors();
     return;
   }
-  if (abs(rear_left_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S &&
-    abs(rear_right_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S)
+  if (abs(left_side_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S &&
+    abs(right_side_velocity_setpoint) <= SETPOINT_DEADBAND_RAD_S)
   {
     stop_motors();
     return;
   }
 
   //  Compute the PID output for both motors.
-  rear_left_pid.Compute();
-  rear_right_pid.Compute();
+  left_side_pid.Compute();
+  right_side_pid.Compute();
 
   if (SERIAL_DEBUG) {
-    Serial.print("RL setpoint: ");
-    Serial.print(rear_left_velocity_setpoint);
+    Serial.print("Left setpoint: ");
+    Serial.print(left_side_velocity_setpoint);
     Serial.print(" measured: ");
-    Serial.print(current_rear_left_rads_sec);
+    Serial.print(current_left_side_rads_sec);
     Serial.print(" output: ");
-    Serial.print(rear_left_output);
-    Serial.print(" | RR setpoint: ");
-    Serial.print(rear_right_velocity_setpoint);
+    Serial.print(left_side_output);
+    Serial.print(" | Right setpoint: ");
+    Serial.print(right_side_velocity_setpoint);
     Serial.print(" measured: ");
-    Serial.print(current_rear_right_rads_sec);
+    Serial.print(current_right_side_rads_sec);
     Serial.print(" output: ");
-    Serial.println(rear_right_output);
+    Serial.println(right_side_output);
   }
 
-  const int rear_left_command = command_with_feedforward(
-      rear_left_output, rear_left_velocity_setpoint, LEFT_FEEDFORWARD_COMMAND);
-  const int rear_right_command = -command_with_feedforward(
-      rear_right_output, rear_right_velocity_setpoint, RIGHT_FEEDFORWARD_COMMAND);
+  const int left_side_command = constrain(
+      command_with_feedforward(
+        left_side_output, left_side_velocity_setpoint, LEFT_FEEDFORWARD_COMMAND),
+      -DEBUG_MAX_MOTOR_COMMAND, DEBUG_MAX_MOTOR_COMMAND);
+  const int right_side_command = constrain(
+      -command_with_feedforward(
+        right_side_output, right_side_velocity_setpoint, RIGHT_FEEDFORWARD_COMMAND),
+      -DEBUG_MAX_MOTOR_COMMAND, DEBUG_MAX_MOTOR_COMMAND);
 
   if (SERIAL_DEBUG) {
-    Serial.print(" commands: RL=");
-    Serial.print(rear_left_command);
-    Serial.print(" RR=");
-    Serial.println(rear_right_command);
+    Serial.print(" commands: left=");
+    Serial.print(left_side_command);
+    Serial.print(" right=");
+    Serial.println(right_side_command);
   }
 
-  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1, rear_right_command);
-  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 2, rear_left_command);
+  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 1, right_side_command);
+  send_sabertooth_command(Serial2, SABERTOOTH_ADDR, 2, left_side_command);
 }
