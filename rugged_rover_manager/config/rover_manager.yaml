@@ -2,28 +2,20 @@ rover_manager:
   ros__parameters:
     battery_warning_voltage: 11.4
     battery_critical_voltage: 10.8
+    platform_timeout_sec: 0.0
+    control_period_sec: 0.1
+    double_toggle_window_sec: 2.0
 
     mode_switch_gpio_chip: "gpiochip4"
     mode_switch_gpio_line: 24
     mode_switch_active_high: true
     mode_switch_debounce_sec: 0.15
 
-    mode_switch_gpio: 24
-    double_toggle_window_sec: 2.0
+    teleop_launch_package: rugged_rover_bringup
+    teleop_launch_file: teleop.launch.py
 
-    platform_timeout_sec: 0.0
-
-    teleop_launch:
-      package: rugged_rover_bringup
-      file: teleop.launch.py
-
-    autonomous_launch:
-      package: rugged_rover_bringup
-      file: bringup.launch.py
-      arguments:
-        use_ekf: "true"
-        use_slam: "true"
-        use_rplidar: "true"
-
-    stop_motors_topic: /platform/motors/cmd
-    motors_enabled_topic: /rover/motors_enabled
+    autonomous_launch_package: rugged_rover_bringup
+    autonomous_launch_file: bringup.launch.py
+    autonomous_use_ekf: true
+    autonomous_use_slam: true
+    autonomous_use_rplidar: true

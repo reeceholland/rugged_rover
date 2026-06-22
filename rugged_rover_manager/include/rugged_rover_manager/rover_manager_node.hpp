@@ -90,7 +90,7 @@ private:
   std::optional<float> latest_battery_voltage_;
   rclcpp::Time last_platform_debug_time_;
   rclcpp::Time last_switch_change_time_;
-  ModeRequest last_mode_request_{ModeRequest::Teleop};
+  ModeRequest last_mode_request_{ModeRequest::NoChange};
 
   // Process tracking.
   std::optional<pid_t> active_launch_pid_;

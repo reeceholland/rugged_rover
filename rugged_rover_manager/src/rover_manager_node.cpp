@@ -38,7 +38,7 @@ RoverManagerNode::RoverManagerNode(const rclcpp::NodeOptions & options)
     "/platform/debug", 10, std::bind(&RoverManagerNode::platform_debug_callback, this, std::placeholders::_1));
 
   state_pub_ = this->create_publisher<std_msgs::msg::String>("/rover/state", 10);
-  motors_enabled_pub_ = this->create_publisher<std_msgs::msg::Bool>("/rover/motor_enabled", 10);
+  motors_enabled_pub_ = this->create_publisher<std_msgs::msg::Bool>("/rover/motors_enabled", 10);
   events_pub_ = this->create_publisher<std_msgs::msg::String>("/rover/events", 10);
 
   last_platform_debug_time_ = this->now();
@@ -129,6 +129,14 @@ void RoverManagerNode::control_loop()
     return;
   }
 
+  const ModeRequest request = read_mode_request();
+
+  if (request == ModeRequest::Stop) {
+    handle_mode_request(request);
+    publish_state();
+    return;
+  }
+
   if (platform_is_stale()) {
     transition_to(RoverState::Fault, "platform debug stale");
     publish_motor_enable(false);
@@ -136,7 +144,6 @@ void RoverManagerNode::control_loop()
     return;
   }
 
-  const ModeRequest request = read_mode_request();
   handle_mode_request(request);
 
   publish_state();
@@ -202,25 +209,35 @@ ModeRequest RoverManagerNode::read_mode_request()
 
   previous_debounced_switch_active_ = debounced_switch_active_;
 
+  const bool mode_request_pending = rising_edge_count_ == 1;
+  const double since_first_edge_sec = (now_time - first_rising_edge_time_).seconds();
+
   if (falling_edge) {
+    if (mode_request_pending && since_first_edge_sec <= double_toggle_window_sec_) {
+      return ModeRequest::NoChange;
+    }
+
     rising_edge_count_ = 0;
     return ModeRequest::Stop;
   }
 
-  if (!rising_edge) {
-    return ModeRequest::NoChange;
+  if (rising_edge) {
+    if (!mode_request_pending || since_first_edge_sec > double_toggle_window_sec_) {
+      rising_edge_count_ = 1;
+      first_rising_edge_time_ = now_time;
+      return ModeRequest::NoChange;
+    }
+
+    rising_edge_count_ = 0;
+    return ModeRequest::Autonomous;
   }
 
-  const double since_first_edge_sec = (now_time - first_rising_edge_time_).seconds();
-
-  if (rising_edge_count_ == 0 || since_first_edge_sec > double_toggle_window_sec_) {
-    rising_edge_count_ = 1;
-    first_rising_edge_time_ = now_time;
+  if (mode_request_pending && since_first_edge_sec > double_toggle_window_sec_) {
+    rising_edge_count_ = 0;
     return ModeRequest::Teleop;
   }
 
-  rising_edge_count_ = 0;
-  return ModeRequest::Autonomous;
+  return ModeRequest::NoChange;
 }
 
 void RoverManagerNode::handle_mode_request(ModeRequest request)
@@ -326,6 +343,10 @@ bool RoverManagerNode::platform_is_stale() const
     return false;
   }
 
+  if (state_ != RoverState::Teleop && state_ != RoverState::Autonomous) {
+    return false;
+  }
+
   const auto age = now() - last_platform_debug_time_;
   return age.seconds() > platform_timeout_sec_;
 }
@@ -333,7 +354,7 @@ bool RoverManagerNode::platform_is_stale() const
 void RoverManagerNode::start_teleop()
 {
   const std::string command =
-    "ros2 launch " + teleop_launch_package_ + " " + teleop_launch_file_ + " &";
+    "ros2 launch " + teleop_launch_package_ + " " + teleop_launch_file_;
 
   RCLCPP_INFO(get_logger(), "starting teleop: %s", command.c_str());
   
@@ -346,8 +367,7 @@ void RoverManagerNode::start_autonomous()
     "ros2 launch " + autonomous_launch_package_ + " " + autonomous_launch_file_ +
     " use_ekf:=" + bool_arg(autonomous_use_ekf_) +
     " use_slam:=" + bool_arg(autonomous_use_slam_) +
-    " use_rplidar:=" + bool_arg(autonomous_use_rplidar_) +
-    " &";
+    " use_rplidar:=" + bool_arg(autonomous_use_rplidar_);
 
   RCLCPP_INFO(get_logger(), "starting autonomous: %s", command.c_str());
   start_launch_process("autonomous", command);
@@ -395,7 +415,7 @@ void RoverManagerNode::start_launch_process(const std::string & name, const std:
 
     const std::string exec_command =  "exec " + command;
 
-    execl("/bin/sh", "bash", "-lc", exec_command.c_str(), nullptr);
+    execl("/bin/bash", "bash", "-lc", exec_command.c_str(), nullptr);
 
     // Only reached if execl fails.
     _exit(127);
