@@ -2,6 +2,12 @@
 
 #include <cstdlib>
 #include <sstream>
+#include <cerrno>
+#include <csignal>
+#include <cstring>
+#include <sys/wait.h>
+#include <thread>
+#include <unistd.h>
 
 #include <gpiod.hpp>
 
@@ -22,6 +28,8 @@ RoverManagerNode::RoverManagerNode(const rclcpp::NodeOptions & options)
   declare_parameters();
   load_parameters();
   setup_mode_switch_gpio();
+  previous_debounced_switch_active_ = debounced_switch_active_;
+  first_rising_edge_time_ = now();
 
   battery_sub_ = this->create_subscription<std_msgs::msg::Float32>(
     "/battery/voltage", 10, std::bind(&RoverManagerNode::battery_callback, this, std::placeholders::_1));
@@ -186,17 +194,41 @@ ModeRequest RoverManagerNode::read_mode_request()
     debounced_switch_active_ = raw_active;
   }
 
-  return debounced_switch_active_ ? ModeRequest::Autonomous : ModeRequest::Teleop;
+  const bool rising_edge =
+    !previous_debounced_switch_active_ && debounced_switch_active_;
+
+  previous_debounced_switch_active_ = debounced_switch_active_;
+
+  if (!rising_edge) {
+    return ModeRequest::NoChange;
+  }
+
+  const double since_first_edge_sec = (now_time - first_rising_edge_time_).seconds();
+
+  if (rising_edge_count_ == 0 || since_first_edge_sec > double_toggle_window_sec_) {
+    rising_edge_count_ = 1;
+    first_rising_edge_time_ = now_time;
+    return ModeRequest::Teleop;
+  }
+
+  rising_edge_count_ = 0;
+  return ModeRequest::Autonomous;
 }
 
 void RoverManagerNode::handle_mode_request(ModeRequest request)
 {
+  if (request == ModeRequest::NoChange) {
+    return;
+  }
+
   if (request != last_mode_request_) {
     last_switch_change_time_ = now();
     last_mode_request_ = request;
   }
 
   switch (request) {
+    case ModeRequest::NoChange:
+      break;
     case ModeRequest::Teleop:
       if (state_ != RoverState::Teleop) {
         stop_active_launch();
@@ -286,10 +318,8 @@ void RoverManagerNode::start_teleop()
     "ros2 launch " + teleop_launch_package_ + " " + teleop_launch_file_ + " &";
 
   RCLCPP_INFO(get_logger(), "starting teleop: %s", command.c_str());
-  std::system(command.c_str());
-
-  active_launch_name_ = "teleop";
-  active_launch_pid_.reset();
+  
+  start_launch_process("teleop", command);
 }
 
 void RoverManagerNode::start_autonomous()
@@ -302,25 +332,7 @@ void RoverManagerNode::start_autonomous()
     " &";
 
   RCLCPP_INFO(get_logger(), "starting autonomous: %s", command.c_str());
-  std::system(command.c_str());
-
-  active_launch_name_ = "autonomous";
-  active_launch_pid_.reset();
-}
-
-void RoverManagerNode::stop_active_launch()
-{
-  if (active_launch_name_.empty()) {
-    return;
-  }
-
-  RCLCPP_WARN(get_logger(), "stopping active launch: %s", active_launch_name_.c_str());
-
-  // Placeholder. Replace with process-group tracking in the real implementation.
-  std::system("pkill -f 'ros2 launch rugged_rover_bringup'");
-
-  active_launch_name_.clear();
-  active_launch_pid_.reset();
+  start_launch_process("autonomous", command);
 }
 
 std::string RoverManagerNode::to_string(RoverState state)
@@ -343,6 +355,108 @@ std::string RoverManagerNode::to_string(RoverState state)
   }
 
   return "unknown";
+}
+
+void RoverManagerNode::start_launch_process(const std::string & name, const std::string & command)
+{
+  stop_active_launch();
+
+  const pid_t pid = fork();
+
+  if(pid < 0) {
+    RCLCPP_ERROR(get_logger(), "Failed to fork for launch process '%s': %s", name.c_str(), std::strerror(errno));
+    return;
+  }
+
+  if(pid == 0)
+  {
+    // Child: create a new process group so the manager can stop the whole launch tree.
+    setpgid(0, 0);
+
+    const std::string exec_command =  "exec " + command;
+
+    execl("/bin/sh", "bash", "-lc", exec_command.c_str(), nullptr);
+
+    // Only reached if execl fails.
+    _exit(127);
+  }
+
+  // Parent: track the child PID.
+  setpgid(pid, pid);
+
+  active_launch_pid_ = pid;
+  active_launch_name_ = name;
+
+  RCLCPP_INFO(get_logger(), "Started %s launch process pid=%d: %s", name.c_str(), pid, command.c_str());
+}
+
+bool RoverManagerNode::wait_for_process_exit(pid_t pid, std::chrono::milliseconds timeout)
+{
+  const auto start_time = std::chrono::steady_clock::now();
+
+  while(std::chrono::steady_clock::now() - start_time < timeout)
+  {
+    int status = 0;
+    const pid_t result = waitpid(pid, &status, WNOHANG);
+
+    if(result == pid)
+    {
+      return true; // Process exited
+    }
+
+    if(result < 0 && errno != ECHILD)
+    {
+      return true;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+
+  return false;
+}
+
+void RoverManagerNode::stop_active_launch()
+{
+  if (!active_launch_pid_.has_value()) {
+    return;
+  }
+
+  const pid_t pid = active_launch_pid_.value();
+
+  RCLCPP_WARN(
+    get_logger(),
+    "stopping %s launch process group pid=%d",
+    active_launch_name_.c_str(),
+    pid);
+
+  // Negative PID means signal the whole process group.
+  if (kill(-pid, SIGINT) != 0 && errno != ESRCH) {
+    RCLCPP_WARN(
+      get_logger(),
+      "failed to send SIGINT to process group %d: %s",
+      pid,
+      std::strerror(errno));
+  }
+
+  if (!wait_for_process_exit(pid, std::chrono::seconds(5))) {
+    RCLCPP_WARN(
+      get_logger(),
+      "launch process group %d did not exit after SIGINT; sending SIGTERM",
+      pid);
+
+    if (kill(-pid, SIGTERM) != 0 && errno != ESRCH) {
+      RCLCPP_WARN(
+        get_logger(),
+        "failed to send SIGTERM to process group %d: %s",
+        pid,
+        std::strerror(errno));
+    }
+
+    wait_for_process_exit(pid, std::chrono::seconds(2));
+  }
+
+  active_launch_pid_.reset();
+  active_launch_name_.clear();
 }
 
 }  // namespace rugged_rover_manager

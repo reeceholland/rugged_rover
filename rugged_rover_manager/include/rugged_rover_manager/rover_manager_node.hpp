@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <sys/types.h>
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/bool.hpp>
@@ -19,6 +20,7 @@ namespace rugged_rover_manager
 
 enum class ModeRequest
 {
+  NoChange,
   Teleop,
   Autonomous,
   Shutdown,
@@ -58,6 +60,9 @@ private:
   void setup_mode_switch_gpio();
   bool read_mode_switch_gpio() const;
 
+  void start_launch_process(const std::string & name, const std::string & command);
+  bool wait_for_process_exit(pid_t pid, std::chrono::milliseconds timeout);
+
   static std::string to_string(RoverState state);
 
   // Parameters
@@ -86,8 +91,8 @@ private:
   rclcpp::Time last_switch_change_time_;
   ModeRequest last_mode_request_{ModeRequest::Teleop};
 
-  // Process tracking. This can later become a small LaunchProcess wrapper.
-  std::optional<int> active_launch_pid_;
+  // Process tracking.
+  std::optional<pid_t> active_launch_pid_;
   std::string active_launch_name_;
 
   // GPIO handling
@@ -99,6 +104,10 @@ private:
   bool last_raw_switch_active_{false};
   bool debounced_switch_active_{false};
   rclcpp::Time last_raw_switch_change_time_;
+
+  int rising_edge_count_{0};
+  rclcpp::Time first_rising_edge_time_;
+  bool previous_debounced_switch_active_{false};
 
   std::optional<gpiod::line> mode_switch_line_;
 
