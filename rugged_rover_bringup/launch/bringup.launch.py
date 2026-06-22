@@ -28,6 +28,7 @@ def generate_launch_description():
     rplidar_serial_port = LaunchConfiguration("rplidar_serial_port")
     rplidar_serial_baudrate = LaunchConfiguration("rplidar_serial_baudrate")
     use_slam = LaunchConfiguration("use_slam")
+    use_nav2 = LaunchConfiguration("use_nav2")
     use_ekf = LaunchConfiguration("use_ekf")
     ekf_output_odom_topic = LaunchConfiguration("ekf_output_odom_topic")
 
@@ -73,6 +74,12 @@ def generate_launch_description():
         "slam.launch.py",
     ])
 
+    nav2_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "nav2.launch.py",
+    ])
+
     robot_description = {
         "robot_description": ParameterValue(
             Command(["xacro ", xacro_path]),
@@ -105,6 +112,11 @@ def generate_launch_description():
             "use_slam",
             default_value="true",
             description="Launch slam_toolbox for live mapping.",
+        ),
+        DeclareLaunchArgument(
+            "use_nav2",
+            default_value="false",
+            description="Launch Nav2 navigation stack.",
         ),
         DeclareLaunchArgument(
             "use_ekf",
@@ -177,6 +189,15 @@ def generate_launch_description():
             condition=IfCondition(use_slam),
             launch_arguments={
                 "use_sim_time": "false",
+            }.items(),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(nav2_launch),
+            condition=IfCondition(use_nav2),
+            launch_arguments={
+                "use_sim_time": "false",
+                "autostart": "true",
             }.items(),
         ),
 

@@ -85,6 +85,7 @@ private:
   bool autonomous_use_ekf_{true};
   bool autonomous_use_slam_{true};
   bool autonomous_use_rplidar_{true};
+  bool autonomous_use_nav2_{true};
 
   // State
   RoverState state_{RoverState::Booting};

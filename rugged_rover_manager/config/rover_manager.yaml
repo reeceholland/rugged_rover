@@ -19,3 +19,4 @@ rover_manager:
     autonomous_use_ekf: true
     autonomous_use_slam: true
     autonomous_use_rplidar: true
+    autonomous_use_nav2: true

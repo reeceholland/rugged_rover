@@ -77,6 +77,7 @@ void RoverManagerNode::declare_parameters()
   declare_parameter("autonomous_use_ekf", autonomous_use_ekf_);
   declare_parameter("autonomous_use_slam", autonomous_use_slam_);
   declare_parameter("autonomous_use_rplidar", autonomous_use_rplidar_);
+  declare_parameter("autonomous_use_nav2", autonomous_use_nav2_);
 
   declare_parameter("mode_switch_gpio_chip", mode_switch_gpio_chip_);
   declare_parameter("mode_switch_gpio_line", mode_switch_gpio_line_);
@@ -103,6 +104,7 @@ void RoverManagerNode::load_parameters()
   get_parameter("autonomous_use_ekf", autonomous_use_ekf_);
   get_parameter("autonomous_use_slam", autonomous_use_slam_);
   get_parameter("autonomous_use_rplidar", autonomous_use_rplidar_);
+  get_parameter("autonomous_use_nav2", autonomous_use_nav2_);
 
   get_parameter("mode_switch_gpio_chip", mode_switch_gpio_chip_);
   get_parameter("mode_switch_gpio_line", mode_switch_gpio_line_);
@@ -367,7 +369,8 @@ void RoverManagerNode::start_autonomous()
     "ros2 launch " + autonomous_launch_package_ + " " + autonomous_launch_file_ +
     " use_ekf:=" + bool_arg(autonomous_use_ekf_) +
     " use_slam:=" + bool_arg(autonomous_use_slam_) +
-    " use_rplidar:=" + bool_arg(autonomous_use_rplidar_);
+    " use_rplidar:=" + bool_arg(autonomous_use_rplidar_) +
+    " use_nav2:=" + bool_arg(autonomous_use_nav2_);
 
   RCLCPP_INFO(get_logger(), "starting autonomous: %s", command.c_str());
   start_launch_process("autonomous", command);
