@@ -26,6 +26,7 @@ The stack supports:
 | `rugged_rover_control` | `ros2_control` controller configuration. |
 | `rugged_rover_hardware_interfaces` | Custom Sabertooth `ros2_control` hardware interface. |
 | `rugged_rover_battery` | Battery voltage monitor and diagnostics node. |
+| `rugged_rover_manager` | GPIO mode switch manager for teleop/autonomous launch control and safety state publishing. |
 | `rugged_rover_interfaces` | Custom message and service definitions. |
 | `rugged_rover_test` | Small command/test publishers. |
 | `micro_ros_platform_firmware` | Teensy firmware for the A4WD3 platform. |
@@ -46,6 +47,7 @@ The current A4WD3 setup assumes:
 - RPLIDAR S2 on `/dev/rplidar`
 - SparkFun Razor IMU on `/dev/razor_imu`
 - Teensy micro-ROS UART on `/dev/ttyAMA0`
+- GPIO24 mode switch for manager-controlled teleop/autonomous selection
 - Optional RealSense D435 depth camera
 - Common ground between the Pi, Teensy, motor driver, battery monitor, and motor power system
 
@@ -83,6 +85,7 @@ The installer:
 - creates udev aliases for the Teensy UART, RPLIDAR, and Razor IMU
 - builds the workspace
 - adds ROS setup lines to ~/.bashrc
+- provides the rover manager and UART permission service examples in this README
 
 After the script finishes, reboot:
 
@@ -348,6 +351,77 @@ Use an explicit RPLIDAR port:
 
 ```bash
 ros2 launch rugged_rover_bringup bringup.launch.py rplidar_serial_port:=/dev/ttyUSB0
+```
+
+Include Nav2 in the same launch tree:
+
+```bash
+ros2 launch rugged_rover_bringup bringup.launch.py use_ekf:=true use_slam:=true use_rplidar:=true use_nav2:=true
+```
+
+## Rover Manager and Mode Switch
+
+`rugged_rover_manager` is the preferred runtime entrypoint on the physical rover. It owns the GPIO24 mode switch, starts and stops launch trees, publishes rover state, and disables motors during stop, low-battery, and fault transitions.
+
+Manager topics:
+
+- `/rover/state`: current state, such as `idle`, `teleop`, or `autonomous`
+- `/rover/events`: state transition messages
+- `/rover/motors_enabled`: high-level motor-enable intent
+
+Switch behavior:
+
+- low/off: stop the active launch tree and return to `idle`
+- one low-to-high rising edge: wait `double_toggle_window_sec`, then enter teleop
+- two low-to-high rising edges within `double_toggle_window_sec`: enter autonomous immediately
+
+Autonomous mode launches:
+
+```bash
+ros2 launch rugged_rover_bringup bringup.launch.py use_ekf:=true use_slam:=true use_rplidar:=true use_nav2:=true
+```
+
+Run manually:
+
+```bash
+cd ~/rugged_rover_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch rugged_rover_manager rover_manager.launch.py use_respawn:=false
+```
+
+For boot startup, run only `rover-manager.service` under systemd. Disable older services that directly launch bringup, teleop, Nav2, or mode switching so they do not fight over ROS nodes or serial devices:
+
+```bash
+sudo systemctl disable --now rover-bringup.service rover-mode-switch.service rover-teleop.service rover-nav2.service 2>/dev/null || true
+```
+
+The manager service should require a UART permission oneshot before it starts:
+
+```ini
+[Unit]
+Description=Rugged Rover Manager
+After=network-online.target rover-uart-permissions.service
+Wants=network-online.target
+Requires=rover-uart-permissions.service
+```
+
+The UART oneshot currently applies the practical Pi UART permission fix:
+
+```ini
+[Service]
+Type=oneshot
+ExecStart=/bin/chmod 666 /dev/ttyAMA0
+RemainAfterExit=yes
+```
+
+After creating or changing the services:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable rover-uart-permissions.service rover-manager.service
+sudo systemctl start rover-manager.service
+journalctl -u rover-manager.service -f
 ```
 
 ## Validate the Stack
