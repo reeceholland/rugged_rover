@@ -21,6 +21,7 @@ namespace rugged_rover_manager
 enum class ModeRequest
 {
   NoChange,
+  Stop,
   Teleop,
   Autonomous,
   Shutdown,

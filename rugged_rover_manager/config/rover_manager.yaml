@@ -11,6 +11,8 @@ rover_manager:
     mode_switch_gpio: 24
     double_toggle_window_sec: 2.0
 
+    platform_timeout_sec: 0.0
+
     teleop_launch:
       package: rugged_rover_bringup
       file: teleop.launch.py

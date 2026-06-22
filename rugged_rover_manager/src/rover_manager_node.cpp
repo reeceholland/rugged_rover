@@ -48,7 +48,7 @@ RoverManagerNode::RoverManagerNode(const rclcpp::NodeOptions & options)
   std::chrono::duration<double>(control_period_sec_),
   std::bind(&RoverManagerNode::control_loop, this));
 
-  transition_to(RoverState::Teleop, "manager started");
+  transition_to(RoverState::Idle, "manager started");
 }
 
 RoverManagerNode::~RoverManagerNode()
@@ -197,7 +197,15 @@ ModeRequest RoverManagerNode::read_mode_request()
   const bool rising_edge =
     !previous_debounced_switch_active_ && debounced_switch_active_;
 
+  const bool falling_edge =
+    previous_debounced_switch_active_ && !debounced_switch_active_;
+
   previous_debounced_switch_active_ = debounced_switch_active_;
+
+  if (falling_edge) {
+    rising_edge_count_ = 0;
+    return ModeRequest::Stop;
+  }
 
   if (!rising_edge) {
     return ModeRequest::NoChange;
@@ -228,6 +236,12 @@ void RoverManagerNode::handle_mode_request(ModeRequest request)
 
   switch (request) {
     case ModeRequest::NoChange:
+      break;
+
+    case ModeRequest::Stop:
+      stop_active_launch();
+      publish_motor_enable(false);
+      transition_to(RoverState::Idle, "switch low");
       break;
     case ModeRequest::Teleop:
       if (state_ != RoverState::Teleop) {
@@ -308,6 +322,10 @@ bool RoverManagerNode::battery_is_critical() const
 
 bool RoverManagerNode::platform_is_stale() const
 {
+  if (platform_timeout_sec_ <= 0.0) {
+    return false;
+  }
+
   const auto age = now() - last_platform_debug_time_;
   return age.seconds() > platform_timeout_sec_;
 }
@@ -350,6 +368,8 @@ std::string RoverManagerNode::to_string(RoverState state)
       return "fault";
     case RoverState::EStopped:
       return "e_stopped";
+    case RoverState::Idle:
+      return "idle";
     case RoverState::ShutdownRequested:
       return "shutdown_requested";
   }

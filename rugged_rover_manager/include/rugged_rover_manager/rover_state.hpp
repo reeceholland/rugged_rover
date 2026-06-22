@@ -5,6 +5,7 @@ namespace rugged_rover_manager
   enum class RoverState
   {
       Booting,
+      Idle,
       Teleop,
       Autonomous,
       LowBattery,
