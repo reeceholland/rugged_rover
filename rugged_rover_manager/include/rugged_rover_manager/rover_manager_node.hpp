@@ -62,7 +62,8 @@ private:
   bool read_mode_switch_gpio() const;
 
   void start_launch_process(const std::string & name, const std::string & command);
-  bool wait_for_process_exit(pid_t pid, std::chrono::milliseconds timeout);
+  bool process_group_exists(pid_t pgid) const;
+  bool wait_for_process_group_exit(pid_t pgid, std::chrono::milliseconds timeout);
 
   static std::string to_string(RoverState state);
 

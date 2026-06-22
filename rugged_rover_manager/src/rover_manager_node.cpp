@@ -430,29 +430,32 @@ void RoverManagerNode::start_launch_process(const std::string & name, const std:
   RCLCPP_INFO(get_logger(), "Started %s launch process pid=%d: %s", name.c_str(), pid, command.c_str());
 }
 
-bool RoverManagerNode::wait_for_process_exit(pid_t pid, std::chrono::milliseconds timeout)
+bool RoverManagerNode::process_group_exists(pid_t pgid) const
+{
+  if (kill(-pgid, 0) == 0) {
+    return true;
+  }
+
+  return errno != ESRCH;
+}
+
+bool RoverManagerNode::wait_for_process_group_exit(pid_t pgid, std::chrono::milliseconds timeout)
 {
   const auto start_time = std::chrono::steady_clock::now();
 
-  while(std::chrono::steady_clock::now() - start_time < timeout)
-  {
+  while (std::chrono::steady_clock::now() - start_time < timeout) {
     int status = 0;
-    const pid_t result = waitpid(pid, &status, WNOHANG);
-
-    if(result == pid)
-    {
-      return true; // Process exited
+    while (waitpid(-pgid, &status, WNOHANG) > 0) {
     }
 
-    if(result < 0 && errno != ECHILD)
-    {
+    if (!process_group_exists(pgid)) {
       return true;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 
-  return false;
+  return !process_group_exists(pgid);
 }
 
 void RoverManagerNode::stop_active_launch()
@@ -478,7 +481,7 @@ void RoverManagerNode::stop_active_launch()
       std::strerror(errno));
   }
 
-  if (!wait_for_process_exit(pid, std::chrono::seconds(5))) {
+  if (!wait_for_process_group_exit(pid, std::chrono::seconds(5))) {
     RCLCPP_WARN(
       get_logger(),
       "launch process group %d did not exit after SIGINT; sending SIGTERM",
@@ -492,7 +495,22 @@ void RoverManagerNode::stop_active_launch()
         std::strerror(errno));
     }
 
-    wait_for_process_exit(pid, std::chrono::seconds(2));
+    if (!wait_for_process_group_exit(pid, std::chrono::seconds(2))) {
+      RCLCPP_WARN(
+        get_logger(),
+        "launch process group %d did not exit after SIGTERM; sending SIGKILL",
+        pid);
+
+      if (kill(-pid, SIGKILL) != 0 && errno != ESRCH) {
+        RCLCPP_WARN(
+          get_logger(),
+          "failed to send SIGKILL to process group %d: %s",
+          pid,
+          std::strerror(errno));
+      }
+
+      wait_for_process_group_exit(pid, std::chrono::seconds(1));
+    }
   }
 
   active_launch_pid_.reset();
