@@ -18,6 +18,9 @@ REPO_URL="${REPO_URL:-git@github.com:reeceholland/rugged_rover.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 GIT_USER_NAME="${GIT_USER_NAME:-Reece Holland}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-reece.j.holland@gmail.com}"
+INSTALL_SYSTEMD_SERVICES="${INSTALL_SYSTEMD_SERVICES:-true}"
+ROVER_SERVICE_USER="${ROVER_SERVICE_USER:-$USER}"
+ROVER_SERVICE_GROUP="${ROVER_SERVICE_GROUP:-$(id -gn "$ROVER_SERVICE_USER" 2>/dev/null || echo "$ROVER_SERVICE_USER")}"
 
 log() {
   echo
@@ -220,6 +223,67 @@ build_workspace() {
   colcon build --symlink-install
 }
 
+install_systemd_services() {
+  if [[ "$INSTALL_SYSTEMD_SERVICES" != "true" ]]; then
+    log "Skipping systemd service installation"
+    return
+  fi
+
+  log "Installing rover systemd services"
+
+  # Older bringup/mode-switch services compete with rover_manager. Disable them
+  # if they exist, but do not fail fresh installs where they were never present.
+  local old_services=(
+    rover-bringup.service
+    rover-mode-switch.service
+    rover-nav2.service
+    rover-teleop.service
+  )
+  sudo systemctl disable --now "${old_services[@]}" 2>/dev/null || true
+
+  sudo tee /etc/systemd/system/rover-uart-permissions.service >/dev/null <<'SERVICE'
+[Unit]
+Description=Prepare Rugged Rover UART permissions
+
+[Service]
+Type=oneshot
+ExecStart=/bin/chmod 666 /dev/ttyAMA0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+  sudo tee /etc/systemd/system/rover-manager.service >/dev/null <<SERVICE
+[Unit]
+Description=Rugged Rover Manager
+After=network-online.target rover-uart-permissions.service
+Wants=network-online.target
+Requires=rover-uart-permissions.service
+
+[Service]
+Type=simple
+User=${ROVER_SERVICE_USER}
+Group=${ROVER_SERVICE_GROUP}
+SupplementaryGroups=dialout gpio
+WorkingDirectory=${WORKSPACE_DIR}
+Environment=ROS_DOMAIN_ID=0
+Environment=RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+Environment=ROS_LOCALHOST_ONLY=0
+ExecStart=/bin/bash -lc 'source /opt/ros/${ROS_DISTRO}/setup.bash && source ${WORKSPACE_DIR}/install/setup.bash && ros2 launch rugged_rover_manager rover_manager.launch.py use_respawn:=false'
+Restart=on-failure
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable rover-uart-permissions.service rover-manager.service
+}
+
 configure_shell() {
   log "Configuring shell environment"
   local bashrc="$HOME/.bashrc"
@@ -249,12 +313,20 @@ Recommended next steps:
   2. After reconnecting, verify devices:
        ls -l /dev/teensy_uart /dev/rplidar /dev/razor_imu 2>/dev/null || true
 
-  3. Launch the rover baseline:
-       ros2 launch rugged_rover_bringup bringup.launch.py use_ekf:=true use_slam:=true use_rplidar:=true
+  3. Check the managed rover services:
+       systemctl status rover-uart-permissions.service
+       systemctl status rover-manager.service
+
+  4. Watch manager logs while testing the mode switch:
+       journalctl -u rover-manager.service -f
+
+  5. If you do not reboot, start the manager manually:
+       sudo systemctl start rover-manager.service
 
 Notes:
   - If bzip2/libbz2 failed before, this script enables noble-updates before installing build tools.
   - If the RPLIDAR symlink does not appear, check lsusb for its VID:PID.
+  - The manager owns teleop/autonomous launching; set INSTALL_SYSTEMD_SERVICES=false only for manual bringup testing.
   - Keep RViz on your laptop when possible; the Pi should run the rover stack.
 EOF
 }
@@ -272,6 +344,7 @@ main() {
   ensure_repo_present
   install_workspace_dependencies
   build_workspace
+  install_systemd_services
   configure_shell
   print_next_steps
 }

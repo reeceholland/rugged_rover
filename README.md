@@ -84,10 +84,10 @@ The installer:
 - initializes submodules
 - creates udev aliases for the Teensy UART, RPLIDAR, and Razor IMU
 - builds the workspace
+- installs and enables the rover manager systemd services
 - adds ROS setup lines to ~/.bashrc
-- provides the rover manager and UART permission service examples in this README
 
-After the script finishes, reboot:
+After the script finishes, reboot so group membership, udev, and systemd startup are cleanly applied:
 
 ```bash
 sudo reboot
@@ -390,7 +390,7 @@ source install/setup.bash
 ros2 launch rugged_rover_manager rover_manager.launch.py use_respawn:=false
 ```
 
-For boot startup, run only `rover-manager.service` under systemd. Disable older services that directly launch bringup, teleop, Nav2, or mode switching so they do not fight over ROS nodes or serial devices:
+The bootstrap script installs and enables `rover-uart-permissions.service` and `rover-manager.service`. For boot startup, run only `rover-manager.service` under systemd. Disable older services that directly launch bringup, teleop, Nav2, or mode switching so they do not fight over ROS nodes or serial devices:
 
 ```bash
 sudo systemctl disable --now rover-bringup.service rover-mode-switch.service rover-teleop.service rover-nav2.service 2>/dev/null || true
@@ -415,7 +415,7 @@ ExecStart=/bin/chmod 666 /dev/ttyAMA0
 RemainAfterExit=yes
 ```
 
-After creating or changing the services:
+If you manually create or change the services later:
 
 ```bash
 sudo systemctl daemon-reload
@@ -794,8 +794,12 @@ ls -l /dev/ttyAMA0
 sudo chmod 666 /dev/ttyAMA0
 ```
 
-The `chmod` command is a temporary fix. The persistent fix is the udev rule in
-`install_pi5_ubuntu24_ros_jazzy.sh`, followed by a reboot.
+The `chmod` command is a temporary fix. The persistent fix is installed by
+`install_pi5_ubuntu24_ros_jazzy.sh` as `rover-uart-permissions.service`, followed by a reboot or:
+
+```bash
+sudo systemctl start rover-uart-permissions.service
+```
 
 Lidar or camera disappears:
 
