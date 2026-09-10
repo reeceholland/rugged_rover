@@ -11,7 +11,7 @@ find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(GPIODCXX REQUIRED libgpiodcxx)
+pkg_check_modules(GPIODCXX REQUIRED IMPORTED_TARGET libgpiodcxx)
 
 add_library(rover_manager_component SHARED
   src/rover_manager_node.cpp
@@ -33,7 +33,7 @@ target_compile_options(rover_manager_component
 )
 
 target_link_libraries(rover_manager_component
-  ${GPIODCXX_LIBRARIES}
+  PkgConfig::GPIODCXX
 )
 
 ament_target_dependencies(rover_manager_component
@@ -71,5 +71,12 @@ ament_export_dependencies(
   rclcpp_components
   std_msgs
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_mode_switch test/test_mode_switch.cpp)
+  target_include_directories(test_mode_switch PRIVATE include)
+  target_compile_features(test_mode_switch PUBLIC cxx_std_17)
+endif()
 
 ament_package()

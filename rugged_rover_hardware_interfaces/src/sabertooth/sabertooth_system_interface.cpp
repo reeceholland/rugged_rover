@@ -15,6 +15,7 @@
 #include "rugged_rover_hardware_interfaces/sabertooth/sabertooth_system_interface.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <string>
 #include <thread>
@@ -55,6 +56,8 @@ SabertoothSystemInterface::on_init(const hardware_interface::HardwareInfo & info
     joint_names_.push_back(joint.name);
   }
 
+  const auto enable = info.hardware_parameters.find("require_motor_enable");
+  require_motor_enable_ = enable == info.hardware_parameters.end() || enable->second != "false";
   const auto command_qos = info.hardware_parameters.find("command_qos");
   if (command_qos != info.hardware_parameters.end()) {
     use_reliable_command_qos_ = command_qos->second == "reliable";
@@ -93,10 +96,22 @@ SabertoothSystemInterface::on_activate(const rclcpp_lifecycle::State &)
         "platform/motors/feedback", rclcpp::SensorDataQoS(),
         std::bind(&SabertoothSystemInterface::feedbackCallback, this, std::placeholders::_1));
 
+  motor_enabled_.store(false);
+  enable_received_ns_.store(0);
+  battery_received_ns_.store(0);
+  motor_enable_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
+    "/rover/motors_enabled", rclcpp::QoS(1).reliable(),
+    [this](const std_msgs::msg::Bool::SharedPtr msg) {
+      motor_enabled_.store(msg->data);
+      enable_received_ns_.store(steady_ns());
+    });
   battery_critical_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
         "platform/battery/is_critical", rclcpp::SensorDataQoS(),
     [this](const std_msgs::msg::Bool::SharedPtr msg)
-    {battery_allows_motion_.store(!msg->data);});
+    {
+      battery_allows_motion_.store(!msg->data);
+      battery_received_ns_.store(steady_ns());
+    });
 
     // Motor commands should be "latest value wins". The real rover uses
     // best-effort so old velocity commands are dropped instead of replayed late.
@@ -149,25 +164,19 @@ SabertoothSystemInterface::on_deactivate(const rclcpp_lifecycle::State &)
   RCLCPP_INFO(rclcpp::get_logger("SabertoothSystemInterface"),
                 "Deactivating hardware interface...");
 
-    // Reset the node, subscription, and publisher to clean up resources
+  // Send a final zero before releasing the command publisher.
+  if (cmd_pub_) {
+    sensor_msgs::msg::JointState stop;
+    stop.name = joint_names_;
+    stop.velocity.assign(joint_names_.size(), 0.0);
+    cmd_pub_->publish(stop);
+  }
+  stop_executor();
   feedback_sub_.reset();
   battery_critical_sub_.reset();
+  motor_enable_sub_.reset();
   cmd_pub_.reset();
   node_.reset();
-
-  executor_running_.store(false);
-  if (executor_) {
-    executor_->cancel();
-  }
-  if (executor_thread_.joinable()) {
-    executor_thread_.join();
-  }
-
-  if (executor_ && node_) {
-    executor_->remove_node(node_);
-  }
-
-  executor_.reset();
 
     // Return success if deactivation is complete
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -241,8 +250,8 @@ hardware_interface::return_type SabertoothSystemInterface::read(
     // the last non-zero velocity forever. Keep the last positions, but report
     // zero wheel velocity so odometry stops advancing in RViz.
   const bool feedback_is_stale =
-    !has_feedback_ || !node_ ||
-    (node_->now() - last_feedback_time_).seconds() > feedback_timeout_seconds_;
+    !has_feedback_ ||
+    (steady_ns() - feedback_received_ns_) > feedback_timeout_seconds_ * 1e9;
   if (feedback_is_stale) {
     std::fill(hw_velocities_.begin(), hw_velocities_.end(), 0.0);
     return hardware_interface::return_type::OK;
@@ -307,10 +316,11 @@ hardware_interface::return_type SabertoothSystemInterface::write(
     // Set the joint names and commands in the command message
   cmd_msg.name = joint_names_;
 
-  if (!battery_allows_motion_.load()) {
+  if (!motion_allowed() || !std::all_of(hw_commands_.begin(), hw_commands_.end(),
+    [](double command) {return std::isfinite(command);}))
+  {
     cmd_msg.velocity.assign(joint_names_.size(), 0.0);
-    RCLCPP_WARN(this->logger_,
-                  "Battery is critical, not sending motor commands to prevent brownout.");
+
   } else {
     cmd_msg.velocity = hw_commands_;
   }
@@ -338,10 +348,60 @@ SabertoothSystemInterface::feedbackCallback(const sensor_msgs::msg::JointState::
     // Lock the feedback mutex to ensure thread safety
   std::lock_guard<std::mutex> lock(feedback_mutex_);
 
+  // Incomplete/nonfinite feedback must not count as a healthy motor link.
+  for (const auto & name : joint_names_) {
+    const auto found = std::find(msg->name.begin(), msg->name.end(), name);
+    const auto index = static_cast<size_t>(std::distance(msg->name.begin(), found));
+    if (found == msg->name.end() || index >= msg->position.size() ||
+      index >= msg->velocity.size() || !std::isfinite(msg->position[index]) ||
+      !std::isfinite(msg->velocity[index]))
+    {
+      has_feedback_ = false;
+      return;
+    }
+  }
+
     // Update the last_feedback_ member variable with the received message
   last_feedback_ = *msg;
-  last_feedback_time_ = node_->now();
+  feedback_received_ns_ = steady_ns();
   has_feedback_ = true;
+}
+
+
+int64_t SabertoothSystemInterface::steady_ns()
+{
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+bool SabertoothSystemInterface::motion_allowed()
+{
+  const auto current = steady_ns();
+  if (require_motor_enable_ &&
+    (!motor_enabled_.load() || enable_received_ns_.load() == 0 ||
+    current - enable_received_ns_.load() > 500000000 ||
+    battery_received_ns_.load() == 0 ||
+    current - battery_received_ns_.load() > 2000000000))
+  {
+    return false;
+  }
+  std::lock_guard<std::mutex> lock(feedback_mutex_);
+  return battery_allows_motion_.load() && has_feedback_ &&
+         current - feedback_received_ns_ <= feedback_timeout_seconds_ * 1e9;
+}
+
+void SabertoothSystemInterface::stop_executor()
+{
+  executor_running_.store(false);
+  if (executor_) {executor_->cancel();}
+  if (executor_thread_.joinable()) {executor_thread_.join();}
+  if (executor_ && node_) {executor_->remove_node(node_);}
+  executor_.reset();
+}
+
+SabertoothSystemInterface::~SabertoothSystemInterface()
+{
+  stop_executor();
 }
 
 } // namespace rugged_rover_hardware_interfaces::sabertooth

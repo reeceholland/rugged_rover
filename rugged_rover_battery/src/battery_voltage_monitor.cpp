@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "rugged_rover_battery/battery_voltage_monitor.hpp"
+#include <cmath>
 
 namespace rugged_rover_battery
 {
@@ -43,7 +44,7 @@ BatteryVoltageMonitor::BatteryVoltageMonitor()
 
     // Initialize subscriber. Teensy firmware and Unity publish the raw voltage here.
   battery_voltage_sub_ = this->create_subscription<std_msgs::msg::Float32>(
-        "battery/voltage", 10,
+        "battery/voltage", rclcpp::SensorDataQoS(),
         std::bind(&BatteryVoltageMonitor::batteryVoltageCallback, this, std::placeholders::_1));
 
   has_voltage_ = false;
@@ -52,6 +53,7 @@ BatteryVoltageMonitor::BatteryVoltageMonitor()
 void BatteryVoltageMonitor::batteryVoltageCallback(const std_msgs::msg::Float32::SharedPtr msg)
 {
   float voltage = msg->data;
+  if (!std::isfinite(voltage) || voltage <= 0.0f) {return;}
   last_voltage_time_ = this->now();
   has_voltage_ = true;
 
@@ -103,12 +105,15 @@ void BatteryVoltageMonitor::publishDiagnostics(float voltage, bool is_low, bool 
 void BatteryVoltageMonitor::timerCallback()
 {
   if (!has_voltage_) {
-    return;   // No voltage received yet
+    publishState(0.0f);
+    publishDiagnostics(0.0, true, true);
+    return;
   }
 
   auto now = this->now();
   if ((now - last_voltage_time_).seconds() > stale_timeout_) {
     RCLCPP_WARN(this->get_logger(), "Battery voltage data is stale!");
+    publishState(0.0f);
     publishDiagnostics(0.0, true, true);   // Publish critical status for stale data
   }
 }

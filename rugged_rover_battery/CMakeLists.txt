@@ -36,6 +36,9 @@ install(DIRECTORY include/
 )
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(battery_delivery test/test_battery_delivery.py
+    ENV ROS_DOMAIN_ID=179 ROS_LOCALHOST_ONLY=1 TIMEOUT 20)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
   # comment the line when a copyright and license is added to all source files

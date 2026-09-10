@@ -1,0 +1,28 @@
+name: Teleop safety regression
+on: [push, pull_request]
+jobs:
+  stopping:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ws/src/rugged_rover
+      - uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+      - name: Install focused dependencies
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd ws
+          rosdep update
+          rosdep install --from-paths src/rugged_rover/rugged_rover_manager src/rugged_rover/rugged_rover_hardware_interfaces src/rugged_rover/rugged_rover_interfaces src/rugged_rover/rugged_rover_battery --ignore-src -r -y --rosdistro jazzy
+      - name: Build and test stopping
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd ws
+          colcon build --packages-select rugged_rover_interfaces rugged_rover_hardware_interfaces rugged_rover_battery rugged_rover_manager
+          source install/setup.bash
+          colcon test --packages-select rugged_rover_hardware_interfaces rugged_rover_battery rugged_rover_manager --ctest-args -R 'test_mode_switch|test_sabertooth_interface|battery_delivery'
+          colcon test-result --verbose

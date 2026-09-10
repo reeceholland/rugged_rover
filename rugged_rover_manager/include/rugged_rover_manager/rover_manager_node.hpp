@@ -14,18 +14,10 @@
 #include <gpiod.hpp>
 
 #include "rugged_rover_manager/rover_state.hpp"
+#include "rugged_rover_manager/mode_switch.hpp"
 
 namespace rugged_rover_manager
 {
-
-enum class ModeRequest
-{
-  NoChange,
-  Stop,
-  Teleop,
-  Autonomous,
-  Shutdown,
-};
 
 class RoverManagerNode : public rclcpp::Node
 {
@@ -70,7 +62,13 @@ private:
   // Parameters
   double battery_warning_voltage_{11.4};
   double battery_critical_voltage_{10.8};
-  double platform_timeout_sec_{2.0};
+  double platform_timeout_sec_{3.0};
+  double startup_timeout_sec_{15.0};
+  std::chrono::steady_clock::time_point launch_started_;
+  std::chrono::steady_clock::time_point debug_received_;
+  std::chrono::steady_clock::time_point battery_received_;
+  bool has_debug_{false};
+  bool has_battery_{false};
   double control_period_sec_{0.1};
   double double_toggle_window_sec_{2.0};
 
@@ -108,9 +106,7 @@ private:
   bool debounced_switch_active_{false};
   rclcpp::Time last_raw_switch_change_time_;
 
-  int rising_edge_count_{0};
-  rclcpp::Time first_rising_edge_time_;
-  bool previous_debounced_switch_active_{false};
+  ModeSwitch mode_switch_;
 
   std::optional<gpiod::line> mode_switch_line_;
 

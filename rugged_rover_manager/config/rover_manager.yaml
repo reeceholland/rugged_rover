@@ -2,7 +2,8 @@ rover_manager:
   ros__parameters:
     battery_warning_voltage: 11.4
     battery_critical_voltage: 10.8
-    platform_timeout_sec: 0.0
+    platform_timeout_sec: 3.0
+    startup_timeout_sec: 15.0
     control_period_sec: 0.1
     double_toggle_window_sec: 2.0
 

@@ -1,6 +1,8 @@
 #include "rugged_rover_manager/rover_manager_node.hpp"
 
 #include <cstdlib>
+#include <cmath>
+#include <stdexcept>
 #include <sstream>
 #include <cerrno>
 #include <csignal>
@@ -16,10 +18,10 @@ namespace rugged_rover_manager
 
 namespace
 {
-  std::string bool_arg(bool value)
-  {
-    return value ? "true" : "false";
-  }
+std::string bool_arg(bool value)
+{
+  return value ? "true" : "false";
+}
 } // namespace
 
 RoverManagerNode::RoverManagerNode(const rclcpp::NodeOptions & options)
@@ -28,17 +30,19 @@ RoverManagerNode::RoverManagerNode(const rclcpp::NodeOptions & options)
   declare_parameters();
   load_parameters();
   setup_mode_switch_gpio();
-  previous_debounced_switch_active_ = debounced_switch_active_;
-  first_rising_edge_time_ = now();
+  mode_switch_ = ModeSwitch(debounced_switch_active_);
 
   battery_sub_ = this->create_subscription<std_msgs::msg::Float32>(
-    "/battery/voltage", 10, std::bind(&RoverManagerNode::battery_callback, this, std::placeholders::_1));
+    "/battery/voltage", rclcpp::SensorDataQoS(),
+      std::bind(&RoverManagerNode::battery_callback, this, std::placeholders::_1));
 
   platform_debug_sub_ = this->create_subscription<std_msgs::msg::String>(
-    "/platform/debug", 10, std::bind(&RoverManagerNode::platform_debug_callback, this, std::placeholders::_1));
+    "/platform/debug", rclcpp::SensorDataQoS(),
+      std::bind(&RoverManagerNode::platform_debug_callback, this, std::placeholders::_1));
 
   state_pub_ = this->create_publisher<std_msgs::msg::String>("/rover/state", 10);
-  motors_enabled_pub_ = this->create_publisher<std_msgs::msg::Bool>("/rover/motors_enabled", 10);
+  motors_enabled_pub_ = this->create_publisher<std_msgs::msg::Bool>("/rover/motors_enabled",
+      rclcpp::QoS(1).reliable());
   events_pub_ = this->create_publisher<std_msgs::msg::String>("/rover/events", 10);
 
   last_platform_debug_time_ = this->now();
@@ -54,8 +58,8 @@ RoverManagerNode::RoverManagerNode(const rclcpp::NodeOptions & options)
 RoverManagerNode::~RoverManagerNode()
 {
   RCLCPP_INFO(this->get_logger(), "Shutting down Rover Manager Node");
-  stop_active_launch();
   publish_motor_enable(false);
+  stop_active_launch();
 }
 
 void RoverManagerNode::declare_parameters()
@@ -63,6 +67,7 @@ void RoverManagerNode::declare_parameters()
   declare_parameter("battery_warning_voltage", battery_warning_voltage_);
   declare_parameter("battery_critical_voltage", battery_critical_voltage_);
   declare_parameter("platform_timeout_sec", platform_timeout_sec_);
+  declare_parameter("startup_timeout_sec", startup_timeout_sec_);
   declare_parameter("control_period_sec", control_period_sec_);
   declare_parameter("double_toggle_window_sec", double_toggle_window_sec_);
 
@@ -90,6 +95,10 @@ void RoverManagerNode::load_parameters()
   get_parameter("battery_warning_voltage", battery_warning_voltage_);
   get_parameter("battery_critical_voltage", battery_critical_voltage_);
   get_parameter("platform_timeout_sec", platform_timeout_sec_);
+  get_parameter("startup_timeout_sec", startup_timeout_sec_);
+  if (platform_timeout_sec_ <= 0.0 || startup_timeout_sec_ <= 0.0) {
+    throw std::invalid_argument("Health timeouts must be positive");
+  }
   get_parameter("control_period_sec", control_period_sec_);
   get_parameter("double_toggle_window_sec", double_toggle_window_sec_);
 
@@ -114,40 +123,47 @@ void RoverManagerNode::load_parameters()
 
 void RoverManagerNode::battery_callback(const std_msgs::msg::Float32::SharedPtr msg)
 {
+  if (!std::isfinite(msg->data) || msg->data <= 0.0f) {return;}
   latest_battery_voltage_ = msg->data;
+  battery_received_ = std::chrono::steady_clock::now();
+  has_battery_ = true;
 }
 
 void RoverManagerNode::platform_debug_callback(const std_msgs::msg::String::SharedPtr)
 {
   last_platform_debug_time_ = now();
+  debug_received_ = std::chrono::steady_clock::now();
+  has_debug_ = true;
 }
 
 void RoverManagerNode::control_loop()
 {
-  if (battery_is_critical()) {
-    transition_to(RoverState::LowBattery, "battery critical");
-    publish_motor_enable(false);
-    stop_active_launch();
-    return;
-  }
-
   const ModeRequest request = read_mode_request();
-
   if (request == ModeRequest::Stop) {
     handle_mode_request(request);
     publish_state();
     return;
   }
-
-  if (platform_is_stale()) {
-    transition_to(RoverState::Fault, "platform debug stale");
-    publish_motor_enable(false);
-    stop_active_launch();
-    return;
+  const bool running = state_ == RoverState::Teleop || state_ == RoverState::Autonomous;
+  if (running) {
+    int status = 0;
+    const bool child_exited = !active_launch_pid_ ||
+      waitpid(active_launch_pid_.value(), &status, WNOHANG) != 0;
+    if (child_exited || platform_is_stale() || battery_is_critical()) {
+      publish_motor_enable(false);
+      transition_to(battery_is_critical() ? RoverState::LowBattery : RoverState::Fault,
+        child_exited ? "launch exited" : "battery critical or telemetry stale");
+      stop_active_launch();
+      return;
+    }
   }
-
   handle_mode_request(request);
-
+  const auto current = std::chrono::steady_clock::now();
+  const bool healthy = has_debug_ && has_battery_ && !battery_is_critical() &&
+    std::chrono::duration<double>(current - debug_received_).count() <= platform_timeout_sec_ &&
+    std::chrono::duration<double>(current - battery_received_).count() <= platform_timeout_sec_;
+  publish_motor_enable(healthy &&
+    (state_ == RoverState::Teleop || state_ == RoverState::Autonomous));
   publish_state();
 }
 
@@ -203,43 +219,9 @@ ModeRequest RoverManagerNode::read_mode_request()
     debounced_switch_active_ = raw_active;
   }
 
-  const bool rising_edge =
-    !previous_debounced_switch_active_ && debounced_switch_active_;
-
-  const bool falling_edge =
-    previous_debounced_switch_active_ && !debounced_switch_active_;
-
-  previous_debounced_switch_active_ = debounced_switch_active_;
-
-  const bool mode_request_pending = rising_edge_count_ == 1;
-  const double since_first_edge_sec = (now_time - first_rising_edge_time_).seconds();
-
-  if (falling_edge) {
-    if (mode_request_pending && since_first_edge_sec <= double_toggle_window_sec_) {
-      return ModeRequest::NoChange;
-    }
-
-    rising_edge_count_ = 0;
-    return ModeRequest::Stop;
-  }
-
-  if (rising_edge) {
-    if (!mode_request_pending || since_first_edge_sec > double_toggle_window_sec_) {
-      rising_edge_count_ = 1;
-      first_rising_edge_time_ = now_time;
-      return ModeRequest::NoChange;
-    }
-
-    rising_edge_count_ = 0;
-    return ModeRequest::Autonomous;
-  }
-
-  if (mode_request_pending && since_first_edge_sec > double_toggle_window_sec_) {
-    rising_edge_count_ = 0;
-    return ModeRequest::Teleop;
-  }
-
-  return ModeRequest::NoChange;
+  return mode_switch_.update(debounced_switch_active_,
+    std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),
+    double_toggle_window_sec_);
 }
 
 void RoverManagerNode::handle_mode_request(ModeRequest request)
@@ -258,31 +240,35 @@ void RoverManagerNode::handle_mode_request(ModeRequest request)
       break;
 
     case ModeRequest::Stop:
-      stop_active_launch();
       publish_motor_enable(false);
+      stop_active_launch();
       transition_to(RoverState::Idle, "switch low");
       break;
     case ModeRequest::Teleop:
       if (state_ != RoverState::Teleop) {
+        publish_motor_enable(false);
         stop_active_launch();
         start_teleop();
-        publish_motor_enable(true);
-        transition_to(RoverState::Teleop, "mode switch teleop");
+        publish_motor_enable(false);
+        transition_to(active_launch_pid_ ? RoverState::Teleop : RoverState::Fault,
+          "mode switch teleop");
       }
       break;
 
     case ModeRequest::Autonomous:
       if (state_ != RoverState::Autonomous) {
+        publish_motor_enable(false);
         stop_active_launch();
         start_autonomous();
-        publish_motor_enable(true);
-        transition_to(RoverState::Autonomous, "mode switch autonomous");
+        publish_motor_enable(false);
+        transition_to(active_launch_pid_ ? RoverState::Autonomous : RoverState::Fault,
+          "mode switch autonomous");
       }
       break;
 
     case ModeRequest::Shutdown:
-      stop_active_launch();
       publish_motor_enable(false);
+      stop_active_launch();
       transition_to(RoverState::ShutdownRequested, "shutdown requested");
       break;
   }
@@ -341,16 +327,12 @@ bool RoverManagerNode::battery_is_critical() const
 
 bool RoverManagerNode::platform_is_stale() const
 {
-  if (platform_timeout_sec_ <= 0.0) {
-    return false;
+  const auto current = std::chrono::steady_clock::now();
+  if (!has_debug_ || !has_battery_) {
+    return std::chrono::duration<double>(current - launch_started_).count() > startup_timeout_sec_;
   }
-
-  if (state_ != RoverState::Teleop && state_ != RoverState::Autonomous) {
-    return false;
-  }
-
-  const auto age = now() - last_platform_debug_time_;
-  return age.seconds() > platform_timeout_sec_;
+  return std::chrono::duration<double>(current - debug_received_).count() > platform_timeout_sec_ ||
+         std::chrono::duration<double>(current - battery_received_).count() > platform_timeout_sec_;
 }
 
 void RoverManagerNode::start_teleop()
@@ -359,7 +341,7 @@ void RoverManagerNode::start_teleop()
     "ros2 launch " + teleop_launch_package_ + " " + teleop_launch_file_;
 
   RCLCPP_INFO(get_logger(), "starting teleop: %s", command.c_str());
-  
+
   start_launch_process("teleop", command);
 }
 
@@ -407,16 +389,16 @@ void RoverManagerNode::start_launch_process(const std::string & name, const std:
   const pid_t pid = fork();
 
   if(pid < 0) {
-    RCLCPP_ERROR(get_logger(), "Failed to fork for launch process '%s': %s", name.c_str(), std::strerror(errno));
+    RCLCPP_ERROR(get_logger(), "Failed to fork for launch process '%s': %s", name.c_str(),
+        std::strerror(errno));
     return;
   }
 
-  if(pid == 0)
-  {
+  if(pid == 0) {
     // Child: create a new process group so the manager can stop the whole launch tree.
     setpgid(0, 0);
 
-    const std::string exec_command =  "exec " + command;
+    const std::string exec_command = "exec " + command;
 
     execl("/bin/bash", "bash", "-lc", exec_command.c_str(), nullptr);
 
@@ -427,10 +409,15 @@ void RoverManagerNode::start_launch_process(const std::string & name, const std:
   // Parent: track the child PID.
   setpgid(pid, pid);
 
+  has_debug_ = false;
+  has_battery_ = false;
+  latest_battery_voltage_.reset();
+  launch_started_ = std::chrono::steady_clock::now();
   active_launch_pid_ = pid;
   active_launch_name_ = name;
 
-  RCLCPP_INFO(get_logger(), "Started %s launch process pid=%d: %s", name.c_str(), pid, command.c_str());
+  RCLCPP_INFO(get_logger(), "Started %s launch process pid=%d: %s", name.c_str(), pid,
+      command.c_str());
 }
 
 bool RoverManagerNode::process_group_exists(pid_t pgid) const
@@ -525,5 +512,3 @@ void RoverManagerNode::stop_active_launch()
 #include <rclcpp_components/register_node_macro.hpp>
 
 RCLCPP_COMPONENTS_REGISTER_NODE(rugged_rover_manager::RoverManagerNode)
-
-

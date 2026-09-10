@@ -424,6 +424,13 @@ sudo systemctl start rover-manager.service
 journalctl -u rover-manager.service -f
 ```
 
+## Reliable Teleop Milestone
+
+See [teleop acceptance](docs/teleop_acceptance.md) for the stop contract, build steps,
+regression tests, and pending physical checks. Real bringup now requires fresh
+manager enable heartbeats before sending nonzero hardware commands. Teleop mode
+also starts joystick control.
+
 ## Validate the Stack
 
 Check nodes:

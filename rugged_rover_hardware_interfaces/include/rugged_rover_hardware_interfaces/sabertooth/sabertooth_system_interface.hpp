@@ -36,7 +36,7 @@ public:
   RCLCPP_SHARED_PTR_DEFINITIONS(SabertoothSystemInterface)
 
   SabertoothSystemInterface() = default;
-  ~SabertoothSystemInterface() override = default;
+  ~SabertoothSystemInterface() override;
 
   hardware_interface::CallbackReturn
   on_init(const hardware_interface::HardwareInfo & info) override;
@@ -64,6 +64,15 @@ public:
   const std::vector<double> & get_hw_velocities() const {return hw_velocities_;}
 
 private:
+  bool motion_allowed();
+  void stop_executor();
+  static int64_t steady_ns();
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr motor_enable_sub_;
+  std::atomic<bool> motor_enabled_{false};
+  std::atomic<int64_t> enable_received_ns_{0};
+  std::atomic<int64_t> battery_received_ns_{0};
+  int64_t feedback_received_ns_{0};
+  bool require_motor_enable_{true};
   rclcpp::Node::SharedPtr node_;
 
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr feedback_sub_;
@@ -82,7 +91,6 @@ private:
   rclcpp::Logger logger_ = rclcpp::get_logger("SabertoothSystemInterface");
 
   sensor_msgs::msg::JointState last_feedback_;
-  rclcpp::Time last_feedback_time_;
   bool has_feedback_ = false;
   double feedback_timeout_seconds_ = 0.25;
   bool use_reliable_command_qos_ = false;

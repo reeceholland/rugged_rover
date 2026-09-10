@@ -16,8 +16,9 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
+from nav2_common.launch import RewrittenYaml
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
@@ -43,6 +44,12 @@ def generate_launch_description():
         "config",
         "controllers.yaml",
     ])
+
+    controller_config = RewrittenYaml(
+        source_file=controller_config,
+        param_rewrites={"enable_odom_tf": PythonExpression(["'", use_ekf, "'.lower() != 'true'"])},
+        convert_types=True,
+    )
 
     imu_launch = PathJoinSubstitution([
         FindPackageShare("razor_imu"),
@@ -229,6 +236,7 @@ def generate_launch_description():
                     executable="spawner",
                     arguments=[
                         "diff_drive_controller",
+                        "--param-file", controller_config,
                         "--controller-manager",
                         "/controller_manager",
                     ],
