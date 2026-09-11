@@ -21,6 +21,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     use_ekf = LaunchConfiguration("use_ekf")
     use_slam = LaunchConfiguration("use_slam")
     use_rplidar = LaunchConfiguration("use_rplidar")
@@ -33,10 +34,24 @@ def generate_launch_description():
         "bringup.launch.py",
     ])
 
-    joy_launch = PathJoinSubstitution([bringup_share, "launch", "joy.launch.py"])
+    keyboard_teleop_launch = PathJoinSubstitution([
+        bringup_share,
+        "launch",
+        "keyboard_teleop.launch.py",
+    ])
 
     return LaunchDescription([
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(joy_launch)),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(keyboard_teleop_launch),
+            launch_arguments={
+                "cmd_vel_topic": cmd_vel_topic,
+            }.items(),
+        ),
+        DeclareLaunchArgument(
+            "cmd_vel_topic",
+            default_value="/cmd_vel",
+            description="Twist command topic produced by keyboard teleop.",
+        ),
         DeclareLaunchArgument(
             "use_ekf",
             default_value="true",

@@ -53,7 +53,7 @@ def test_exactly_one_odom_tf_owner():
             path.unlink()
 
 
-def test_teleop_includes_joystick():
+def test_teleop_includes_keyboard():
     from launch.actions import IncludeLaunchDescription
     description = load('teleop').generate_launch_description()
     context = LaunchContext()
@@ -62,4 +62,4 @@ def test_teleop_includes_joystick():
         if isinstance(action, IncludeLaunchDescription):
             action.launch_description_source.get_launch_description(context)
             locations.append(action.launch_description_source.location)
-    assert any('joy.launch.py' in location for location in locations)
+    assert any('keyboard_teleop.launch.py' in location for location in locations)
