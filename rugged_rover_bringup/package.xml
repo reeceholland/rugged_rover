@@ -18,6 +18,7 @@
   <depend>rugged_rover_hardware_interfaces</depend>
 
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
   <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
   <exec_depend>rugged_rover_battery</exec_depend>

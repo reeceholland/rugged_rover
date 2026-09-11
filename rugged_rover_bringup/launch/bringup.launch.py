@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
@@ -30,6 +30,7 @@ def generate_launch_description():
     rplidar_serial_baudrate = LaunchConfiguration("rplidar_serial_baudrate")
     use_slam = LaunchConfiguration("use_slam")
     use_nav2 = LaunchConfiguration("use_nav2")
+    enable_motors = LaunchConfiguration("enable_motors")
     use_ekf = LaunchConfiguration("use_ekf")
     ekf_output_odom_topic = LaunchConfiguration("ekf_output_odom_topic")
 
@@ -63,11 +64,11 @@ def generate_launch_description():
         "ekf.launch.py",
     ])
 
-    # d435_launch = PathJoinSubstitution([
-    #     FindPackageShare("rugged_rover_bringup"),
-    #     "launch",
-    #     "d435.launch.py",
-    # ])
+    d435_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "d435.launch.py",
+    ])
 
     rplidar_launch = PathJoinSubstitution([
         FindPackageShare("rugged_rover_bringup"),
@@ -126,6 +127,11 @@ def generate_launch_description():
             description="Launch Nav2 navigation stack.",
         ),
         DeclareLaunchArgument(
+            "enable_motors",
+            default_value="false",
+            description="Publish the motor-enable heartbeat for direct bringup control.",
+        ),
+        DeclareLaunchArgument(
             "use_ekf",
             default_value="false",
             description="Launch robot_localization EKF. Disable while validating raw wheel odom.",
@@ -176,9 +182,9 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(d435_launch),
-        # ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(d435_launch),
+        ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(rplidar_launch),
@@ -206,6 +212,19 @@ def generate_launch_description():
                 "use_sim_time": "false",
                 "autostart": "true",
             }.items(),
+        ),
+
+        ExecuteProcess(
+            cmd=[
+                "bash",
+                "-lc",
+                (
+                    "exec ros2 topic pub /rover/motors_enabled "
+                    "std_msgs/msg/Bool '{data: true}' -r 10 > /dev/null"
+                ),
+            ],
+            output="log",
+            condition=IfCondition(enable_motors),
         ),
 
         Node(
