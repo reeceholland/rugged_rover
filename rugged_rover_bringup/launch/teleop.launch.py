@@ -41,16 +41,16 @@ def generate_launch_description():
     ])
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "cmd_vel_topic",
+            default_value="/cmd_vel",
+            description="Twist command topic produced by keyboard teleop.",
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(keyboard_teleop_launch),
             launch_arguments={
                 "cmd_vel_topic": cmd_vel_topic,
             }.items(),
-        ),
-        DeclareLaunchArgument(
-            "cmd_vel_topic",
-            default_value="/cmd_vel",
-            description="Twist command topic produced by keyboard teleop.",
         ),
         DeclareLaunchArgument(
             "use_ekf",
