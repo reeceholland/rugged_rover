@@ -9,7 +9,7 @@ rover_manager:
 
     mode_switch_gpio_chip: "gpiochip4"
     mode_switch_gpio_line: 24
-    mode_switch_active_high: true
+    mode_switch_active_high: false
     mode_switch_debounce_sec: 0.15
 
     teleop_launch_package: rugged_rover_bringup

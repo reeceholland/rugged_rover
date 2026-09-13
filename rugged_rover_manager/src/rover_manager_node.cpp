@@ -30,7 +30,9 @@ RoverManagerNode::RoverManagerNode(const rclcpp::NodeOptions & options)
   declare_parameters();
   load_parameters();
   setup_mode_switch_gpio();
-  mode_switch_ = ModeSwitch(debounced_switch_active_);
+  // Treat a switch that is already active at startup as a pending single-toggle
+  // request, so power-on with the switch on enters teleop after the normal window.
+  mode_switch_ = ModeSwitch(false);
 
   battery_sub_ = this->create_subscription<std_msgs::msg::Float32>(
     "/battery/voltage", rclcpp::SensorDataQoS(),

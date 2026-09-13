@@ -21,10 +21,10 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
     use_ekf = LaunchConfiguration("use_ekf")
     use_slam = LaunchConfiguration("use_slam")
     use_rplidar = LaunchConfiguration("use_rplidar")
+    enable_motors = LaunchConfiguration("enable_motors")
 
     bringup_share = FindPackageShare("rugged_rover_bringup")
 
@@ -34,24 +34,8 @@ def generate_launch_description():
         "bringup.launch.py",
     ])
 
-    keyboard_teleop_launch = PathJoinSubstitution([
-        bringup_share,
-        "launch",
-        "keyboard_teleop.launch.py",
-    ])
 
     return LaunchDescription([
-        DeclareLaunchArgument(
-            "cmd_vel_topic",
-            default_value="/cmd_vel",
-            description="Twist command topic produced by keyboard teleop.",
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(keyboard_teleop_launch),
-            launch_arguments={
-                "cmd_vel_topic": cmd_vel_topic,
-            }.items(),
-        ),
         DeclareLaunchArgument(
             "use_ekf",
             default_value="true",
@@ -67,6 +51,14 @@ def generate_launch_description():
             default_value="true",
             description="Start RPLidar through bringup.",
         ),
+        DeclareLaunchArgument(
+            "enable_motors",
+            default_value="false",
+            description=(
+                "Publish a direct motor-enable heartbeat for manual teleop launches. "
+                "Leave false when teleop is started by rover_manager."
+            ),
+        ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(bringup_launch),
@@ -74,6 +66,7 @@ def generate_launch_description():
                 "use_ekf": use_ekf,
                 "use_slam": use_slam,
                 "use_rplidar": use_rplidar,
+                "enable_motors": enable_motors,
             }.items(),
         ),
     ])

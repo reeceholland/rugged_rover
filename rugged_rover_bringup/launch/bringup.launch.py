@@ -14,7 +14,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
@@ -26,6 +26,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     micro_ros_device = LaunchConfiguration("micro_ros_device")
     use_rplidar = LaunchConfiguration("use_rplidar")
+    use_d435 = LaunchConfiguration("use_d435")
     rplidar_serial_port = LaunchConfiguration("rplidar_serial_port")
     rplidar_serial_baudrate = LaunchConfiguration("rplidar_serial_baudrate")
     use_slam = LaunchConfiguration("use_slam")
@@ -103,8 +104,11 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "use_rplidar",
-            default_value="true",
-            description="Launch the RPLIDAR S2 driver.",
+            default_value="false",
+            description=(
+                "Launch the RPLIDAR S2 driver. Manager-controlled teleop and "
+                "autonomous modes enable this when the mode switch is active."
+            ),
         ),
         DeclareLaunchArgument(
             "rplidar_serial_port",
@@ -115,6 +119,11 @@ def generate_launch_description():
             "rplidar_serial_baudrate",
             default_value="1000000",
             description="Serial baudrate used by the RPLIDAR S2.",
+        ),
+        DeclareLaunchArgument(
+            "use_d435",
+            default_value="false",
+            description="Launch the RealSense D435 camera.",
         ),
         DeclareLaunchArgument(
             "use_slam",
@@ -184,6 +193,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(d435_launch),
+            condition=IfCondition(use_d435),
         ),
 
         IncludeLaunchDescription(
@@ -216,6 +226,28 @@ def generate_launch_description():
 
         ExecuteProcess(
             cmd=[
+                "ros2",
+                "run",
+                "topic_tools",
+                "transform",
+                "/cmd_vel",
+                "/diff_drive_controller/cmd_vel",
+                "geometry_msgs/msg/TwistStamped",
+                "geometry_msgs.msg.TwistStamped(header=std_msgs.msg.Header(frame_id='base_link'), twist=m)",
+                "--import",
+                "geometry_msgs",
+                "std_msgs",
+                "--wait-for-start",
+                "--qos-reliability",
+                "reliable",
+            ],
+            name="cmd_vel_to_diff_drive",
+            output="screen",
+            condition=UnlessCondition(use_nav2),
+        ),
+
+        ExecuteProcess(
+            cmd=[
                 "bash",
                 "-lc",
                 (
@@ -223,6 +255,7 @@ def generate_launch_description():
                     "std_msgs/msg/Bool '{data: true}' -r 10 > /dev/null"
                 ),
             ],
+            name="manual_motor_enable",
             output="log",
             condition=IfCondition(enable_motors),
         ),

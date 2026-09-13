@@ -47,7 +47,7 @@ The current A4WD3 setup assumes:
 - RPLIDAR S2 on `/dev/rplidar`
 - SparkFun Razor IMU on `/dev/razor_imu`
 - Teensy micro-ROS UART on `/dev/ttyAMA0`
-- GPIO24 mode switch for manager-controlled teleop/autonomous selection
+- GPIO24 active-low mode switch for manager-controlled teleop/autonomous selection
 - Optional RealSense D435 depth camera
 - Common ground between the Pi, Teensy, motor driver, battery monitor, and motor power system
 
@@ -62,6 +62,69 @@ These are effective odometry values, not simply the measured wheel-to-wheel
 distance. The physical rear wheel center-to-center distance is about `0.355 m`,
 but the skid-steer odometry needed a larger effective separation after rotation
 testing.
+
+## Normal Rover Operation
+
+The normal real-rover entrypoint is the manager service. It owns the physical
+mode switch, starts the selected launch mode, starts the lidar only while a mode
+is active, and publishes the `/rover/motors_enabled` safety state. Avoid starting
+`bringup.launch.py` manually while the manager is running because duplicate
+hardware, controller, or SLAM nodes can compete for the same topics and devices.
+
+The manager service also reapplies `/dev/ttyAMA0` permissions before every start,
+so restarting the service recovers the micro-ROS UART permission issue without a
+separate `chmod` step.
+
+Check the manager service:
+
+```bash
+systemctl status rover-manager.service --no-pager -l
+```
+
+Restart it after rebuilding or changing manager configuration:
+
+```bash
+sudo systemctl restart rover-manager.service
+```
+
+Watch the manager while testing the physical switch:
+
+```bash
+journalctl -u rover-manager.service -f
+```
+
+Useful ROS state checks:
+
+```bash
+ros2 topic echo /rover/state --once
+ros2 topic echo /rover/events --once
+ros2 topic echo /rover/motors_enabled --once
+ros2 control list_controllers
+```
+
+The configured GPIO24 mode switch is active-low. Its behavior is:
+
+- switch on: teleop/mapping mode after the double-toggle window expires
+- switch off then on twice within the configured window: autonomous/Nav2 mode
+- switch off: stop the active mode and disable motion
+
+Keyboard teleop needs a focused terminal for key input. Start it separately after
+the switch has selected teleop mode:
+
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+For manual debugging without `rover_manager`, start teleop with explicit motor
+and lidar choices:
+
+```bash
+ros2 launch rugged_rover_bringup teleop.launch.py enable_motors:=true use_rplidar:=true
+```
+
+Leave `enable_motors` at its default `false` for manager-controlled launches. Bare
+`bringup.launch.py` defaults to `use_rplidar:=false`; manager-controlled teleop
+and autonomous modes explicitly enable lidar while the switch is high.
 
 ## Fresh Raspberry Pi 5 Setup
 

@@ -238,6 +238,7 @@ install_systemd_services() {
     rover-mode-switch.service
     rover-nav2.service
     rover-teleop.service
+    rugged-rover-manager.service
   )
   sudo systemctl disable --now "${old_services[@]}" 2>/dev/null || true
 
@@ -270,6 +271,7 @@ WorkingDirectory=${WORKSPACE_DIR}
 Environment=ROS_DOMAIN_ID=0
 Environment=RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 Environment=ROS_LOCALHOST_ONLY=0
+ExecStartPre=+/bin/chmod 666 /dev/ttyAMA0
 ExecStart=/bin/bash -lc 'source /opt/ros/${ROS_DISTRO}/setup.bash && source ${WORKSPACE_DIR}/install/setup.bash && ros2 launch rugged_rover_manager rover_manager.launch.py use_respawn:=false'
 Restart=on-failure
 RestartSec=2

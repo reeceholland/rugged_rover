@@ -42,13 +42,12 @@ TEST(ModeSwitch, DoubleToggleStillSelectsAutonomous)
   EXPECT_EQ(s.update(false, 1.2, 2), ModeRequest::Stop);
   EXPECT_EQ(s.update(false, 4, 2), ModeRequest::NoChange);
 }
-TEST(ModeSwitch, HighAtStartupRequiresNewEdge)
+TEST(ModeSwitch, HighAtStartupStartsTeleopAfterWindow)
 {
-  ModeSwitch s(true);
+  ModeSwitch s;
   EXPECT_EQ(s.update(true, 3, 2), ModeRequest::NoChange);
-  EXPECT_EQ(s.update(false, 4, 2), ModeRequest::Stop);
-  EXPECT_EQ(s.update(true, 5, 2), ModeRequest::NoChange);
-  EXPECT_EQ(s.update(true, 7.1, 2), ModeRequest::Teleop);
+  EXPECT_EQ(s.update(true, 5.1, 2), ModeRequest::Teleop);
+  EXPECT_EQ(s.update(false, 6, 2), ModeRequest::Stop);
 }
 TEST(ModeSwitch, LateSecondToggleStartsNewWindow)
 {

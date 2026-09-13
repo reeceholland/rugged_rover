@@ -26,14 +26,22 @@ sudo systemctl restart rover-manager.service
 journalctl -u rover-manager.service -f
 ```
 
-Keep the switch low during startup. A single rising edge waits two seconds before
-starting teleop; a falling edge always stops. Two rising edges within two seconds
-still request autonomous mode. For this milestone, use only single toggles.
+The GPIO24 switch is active-low in software. The physical switch may be low or already high when the manager starts. If it is already
+high, the manager treats it as a pending single-toggle request and starts teleop
+after the configured double-toggle window expires. A falling edge always stops.
+Two rising edges within two seconds still request autonomous mode. For this
+milestone, use only single toggles.
 
-Teleop now includes joy.launch.py. Hold the configured drive-enable button to
-drive. Verify the actual controller's button mapping before moving on the ground.
-The existing turbo button is a separate enable in teleop_twist_joy; it does not
-require the normal enable button to also be held.
+Keyboard teleop is not launched inside the manager because it needs a focused
+terminal for stdin. Lidar should only be running while the switch-selected teleop
+or autonomous launch is active. Start keyboard teleop separately after the manager
+enters teleop:
+
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+Use a small command first, with the rover raised or in a clear area.
 
 ## Stop contract
 
@@ -64,17 +72,17 @@ with rosbag, plus video or a stopwatch for actual wheel stopping.
 
 | Test | Required result | Actual result |
 | --- | --- | --- |
-| Boot with switch low or already high | No wheel motion; high at boot needs a new edge | Pending |
-| Single toggle, healthy sensors, enable released | Teleop starts, joystick nodes present, wheels stationary | Pending |
+| Boot with switch low | Manager remains idle and motors stay disabled | Pending |
+| Boot or restart with switch already high | Teleop starts after the double-toggle window; motors enable only after fresh telemetry | Pending |
 | Brief high then low within two seconds | Remains stopped after window expires | Pending |
-| Hold enable and small stick input, then release enable | Zero command and physical stop; measure latency | Pending |
-| Switch low while moving | Disable precedes shutdown, commands/wheels stop | Pending |
-| Unplug joystick while holding drive input | Command stream stops or becomes zero; wheels stop | Pending |
+| Start keyboard teleop and press a small forward command | `/cmd_vel` reaches `/diff_drive_controller/cmd_vel`, motor commands become nonzero, and motion is controlled | Pending |
+| Switch low while moving | Disable precedes shutdown; commands, wheels, and lidar stop | Pending |
+| Stop keyboard teleop while commanding motion | Command stream stops or becomes zero; wheels stop | Pending |
 | Stop/kill manager while moving | Heartbeat loss inhibits commands within 500 ms plus a control cycle | Pending |
 | Disconnect Pi-Teensy link while moving | Existing firmware watchdog stops wheels; measure latency | Pending |
 | Lose feedback while command source stays active | Hardware command becomes zero after 250 ms plus a control cycle | Pending |
 | Battery telemetry stops | Battery monitor publishes critical; manager faults; wheels stop | Pending |
-| Restart stack after fault with switch left high | No automatic restart; deliberate low/high required | Pending |
+| Restart stack after fault with switch left high | Teleop restarts after the double-toggle window once telemetry is healthy | Pending |
 | Repeat ten start/stop cycles | No orphan processes, duplicate controller managers or unintended motion | Pending |
 | EKF off, then on in separate runs | Exactly one odom-to-base_link TF publisher in each run | Pending |
 
