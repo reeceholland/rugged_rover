@@ -34,6 +34,10 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument(
+            "publish_stamped_twist", default_value="true", choices=["true", "false"],
+            description="Use stamped commands for direct controller input.",
+        ),
+        DeclareLaunchArgument(
             "joy_dev",
             default_value="0",
             description="Joystick device id passed to joy_node.",
@@ -60,7 +64,10 @@ def generate_launch_description():
             package="teleop_twist_joy",
             executable="teleop_node",
             name="teleop_twist_joy_node",
-            parameters=[joy_config],
+            parameters=[joy_config, {
+                "publish_stamped_twist": ParameterValue(
+                    LaunchConfiguration("publish_stamped_twist"), value_type=bool),
+            }],
             remappings=[
                 ("/cmd_vel", cmd_vel_topic),
             ],

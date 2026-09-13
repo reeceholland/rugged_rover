@@ -14,8 +14,9 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import EqualsSubstitution, LaunchConfiguration, PathJoinSubstitution
 
 from launch_ros.substitutions import FindPackageShare
 
@@ -36,6 +37,24 @@ def generate_launch_description():
 
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "teleop_input", default_value="keyboard", choices=["keyboard", "joypad"],
+            description="Keyboard in a separate terminal, or an automatically launched joypad.",
+        ),
+        DeclareLaunchArgument(
+            "joy_dev", default_value="0", description="Joypad device index.",
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(PathJoinSubstitution([
+                bringup_share, "launch", "joy.launch.py",
+            ])),
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration("teleop_input"), "joypad")),
+            launch_arguments={
+                "joy_dev": LaunchConfiguration("joy_dev"),
+                "cmd_vel_topic": "/cmd_vel",
+                "publish_stamped_twist": "false",
+            }.items(),
+        ),
         DeclareLaunchArgument(
             "use_ekf",
             default_value="true",

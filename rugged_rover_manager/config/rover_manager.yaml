@@ -14,6 +14,9 @@ rover_manager:
 
     teleop_launch_package: rugged_rover_bringup
     teleop_launch_file: teleop.launch.py
+    # keyboard uses a separate terminal; joypad starts joy nodes with teleop.
+    teleop_input: keyboard # or joypad
+    teleop_joy_dev: 0
 
     autonomous_launch_package: rugged_rover_bringup
     autonomous_launch_file: bringup.launch.py

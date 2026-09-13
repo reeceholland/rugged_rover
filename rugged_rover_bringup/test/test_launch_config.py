@@ -53,13 +53,32 @@ def test_exactly_one_odom_tf_owner():
             path.unlink()
 
 
-def test_teleop_includes_keyboard():
-    from launch.actions import IncludeLaunchDescription
+def test_teleop_input_selection():
+    from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
     description = load('teleop').generate_launch_description()
-    context = LaunchContext()
-    locations = []
-    for action in description.entities:
-        if isinstance(action, IncludeLaunchDescription):
+    declarations = {a.name: a for a in description.entities
+                    if isinstance(a, DeclareLaunchArgument)}
+    assert declarations['teleop_input'].choices == ['keyboard', 'joypad']
+    for selection in ['keyboard', 'joypad']:
+        context = LaunchContext()
+        context.launch_configurations.update(teleop_input=selection, joy_dev='1')
+        locations = []
+        for action in description.entities:
+            if not isinstance(action, IncludeLaunchDescription):
+                continue
+            if action.condition is not None and not action.condition.evaluate(context):
+                continue
             action.launch_description_source.get_launch_description(context)
-            locations.append(action.launch_description_source.location)
-    assert any('keyboard_teleop.launch.py' in location for location in locations)
+            location = action.launch_description_source.location
+            locations.append(location)
+            if location.endswith('/joy.launch.py'):
+                arguments = dict(action.launch_arguments)
+                assert arguments['cmd_vel_topic'] == '/cmd_vel'
+                assert arguments['publish_stamped_twist'] == 'false'
+            if location.endswith('/bringup.launch.py'):
+                arguments = dict(action.launch_arguments)
+                declarations['enable_motors'].execute(context)
+                assert arguments['enable_motors'].perform(context) == 'false'
+        assert any(p.endswith('/bringup.launch.py') for p in locations)
+        assert any(p.endswith('/joy.launch.py') for p in locations) == (selection == 'joypad')
+        assert not any(p.endswith('/keyboard_teleop.launch.py') for p in locations)

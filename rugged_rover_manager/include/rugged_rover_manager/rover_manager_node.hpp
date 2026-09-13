@@ -76,6 +76,8 @@ private:
 
   std::string teleop_launch_package_{"rugged_rover_bringup"};
   std::string teleop_launch_file_{"teleop.launch.py"};
+  std::string teleop_input_{"keyboard"};
+  int teleop_joy_dev_{0};
 
   std::string autonomous_launch_package_{"rugged_rover_bringup"};
   std::string autonomous_launch_file_{"bringup.launch.py"};

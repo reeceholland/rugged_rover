@@ -32,6 +32,8 @@ after the configured double-toggle window expires. A falling edge always stops.
 Two rising edges within two seconds still request autonomous mode. For this
 milestone, use only single toggles.
 
+Set `teleop_input` in the manager YAML to `keyboard` (default) or `joypad`.
+Joypad mode starts the joystick nodes automatically using `teleop_joy_dev`.
 Keyboard teleop is not launched inside the manager because it needs a focused
 terminal for stdin. Lidar should only be running while the switch-selected teleop
 or autonomous launch is active. Start keyboard teleop separately after the manager
@@ -78,6 +80,9 @@ with rosbag, plus video or a stopwatch for actual wheel stopping.
 | Start keyboard teleop and press a small forward command | `/cmd_vel` reaches `/diff_drive_controller/cmd_vel`, motor commands become nonzero, and motion is controlled | Pending |
 | Switch low while moving | Disable precedes shutdown; commands, wheels, and lidar stop | Pending |
 | Stop keyboard teleop while commanding motion | Command stream stops or becomes zero; wheels stop | Pending |
+| Joypad: release the normal or turbo enable button | Zero command and physical stop; measure latency | Pending |
+| Joypad: disconnect while holding drive input | Command stream stops or becomes zero; wheels stop | Pending |
+| Select keyboard, then joypad in separate launches | Only joypad mode starts joystick nodes; both use the command converter | Pending |
 | Stop/kill manager while moving | Heartbeat loss inhibits commands within 500 ms plus a control cycle | Pending |
 | Disconnect Pi-Teensy link while moving | Existing firmware watchdog stops wheels; measure latency | Pending |
 | Lose feedback while command source stays active | Hardware command becomes zero after 250 ms plus a control cycle | Pending |

@@ -77,6 +77,8 @@ void RoverManagerNode::declare_parameters()
 
   declare_parameter("teleop_launch_package", teleop_launch_package_);
   declare_parameter("teleop_launch_file", teleop_launch_file_);
+  declare_parameter("teleop_input", teleop_input_);
+  declare_parameter("teleop_joy_dev", teleop_joy_dev_);
 
   declare_parameter("autonomous_launch_package", autonomous_launch_package_);
   declare_parameter("autonomous_launch_file", autonomous_launch_file_);
@@ -108,6 +110,14 @@ void RoverManagerNode::load_parameters()
 
   get_parameter("teleop_launch_package", teleop_launch_package_);
   get_parameter("teleop_launch_file", teleop_launch_file_);
+  get_parameter("teleop_input", teleop_input_);
+  get_parameter("teleop_joy_dev", teleop_joy_dev_);
+  if (teleop_input_ != "keyboard" && teleop_input_ != "joypad") {
+    throw std::invalid_argument("teleop_input must be keyboard or joypad");
+  }
+  if (teleop_joy_dev_ < 0) {
+    throw std::invalid_argument("teleop_joy_dev must be nonnegative");
+  }
 
   get_parameter("autonomous_launch_package", autonomous_launch_package_);
   get_parameter("autonomous_launch_file", autonomous_launch_file_);
@@ -340,7 +350,8 @@ bool RoverManagerNode::platform_is_stale() const
 void RoverManagerNode::start_teleop()
 {
   const std::string command =
-    "ros2 launch " + teleop_launch_package_ + " " + teleop_launch_file_;
+    "ros2 launch " + teleop_launch_package_ + " " + teleop_launch_file_ +
+    " teleop_input:=" + teleop_input_ + " joy_dev:=" + std::to_string(teleop_joy_dev_);
 
   RCLCPP_INFO(get_logger(), "starting teleop: %s", command.c_str());
 

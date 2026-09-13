@@ -126,6 +126,37 @@ Leave `enable_motors` at its default `false` for manager-controlled launches. Ba
 `bringup.launch.py` defaults to `use_rplidar:=false`; manager-controlled teleop
 and autonomous modes explicitly enable lidar while the switch is high.
 
+## Select keyboard or joypad
+
+Set `teleop_input: keyboard` or `teleop_input: joypad` in
+`rugged_rover_manager/config/rover_manager.yaml`. `teleop_joy_dev` selects the
+joypad device index (default 0). Rebuild the manager and bringup packages, then
+restart the manager service with the physical switch off. The selection applies
+when the manager next launches teleop; it is not a live input switch.
+
+Keyboard is the default. After selecting teleop with the physical switch, run
+`ros2 run teleop_twist_keyboard teleop_twist_keyboard` in a focused terminal.
+Joypad mode automatically starts `joy_node` and `teleop_twist_joy`; no keyboard
+process is started. The joypad must be connected to the computer running teleop.
+
+For standalone launches (with the manager stopped):
+
+```bash
+ros2 launch rugged_rover_bringup teleop.launch.py teleop_input:=keyboard
+ros2 launch rugged_rover_bringup teleop.launch.py teleop_input:=joypad joy_dev:=0
+```
+
+These commands keep motor enable disabled by default. Use the existing explicit
+`enable_motors:=true` option for manual driving. Both inputs publish `Twist` on
+`/cmd_vel`, which bringup converts to the controller's `TwistStamped` commands.
+Run only the selected input publisher during driving; this selection does not
+arbitrate unrelated publishers on `/cmd_vel`.
+
+Joypad axes, speeds, and buttons are configured in
+`rugged_rover_bringup/config/joy.yaml`. Button 4 enables normal driving; button 5
+independently enables turbo. Verify the mapping for your controller, including
+release and disconnect stopping behavior, with wheels raised first.
+
 ## Fresh Raspberry Pi 5 Setup
 
 Start from Ubuntu Server 24.04 on the Raspberry Pi 5. SSH into the Pi, then run:
