@@ -14,8 +14,9 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
@@ -25,6 +26,14 @@ def generate_launch_description():
     description_pkg = FindPackageShare("rugged_rover_robot_description")
     wheel_odom_topic = LaunchConfiguration("wheel_odom_topic")
     ekf_output_odom_topic = LaunchConfiguration("ekf_output_odom_topic")
+    ekf_input_odom_topic = PythonExpression([
+        "'/wheel/odom_faulted' if '", LaunchConfiguration("use_odom_fault_injection"),
+        "' == 'true' else '", wheel_odom_topic, "'",
+    ])
+    motor_command_topic = PythonExpression([
+        "'/platform/motors/cmd_raw' if '", LaunchConfiguration("use_motor_fault_injection"),
+        "' == 'true' else '/platform/motors/cmd'",
+    ])
     ros_tcp_ip = LaunchConfiguration("ros_tcp_ip")
     ros_tcp_port = LaunchConfiguration("ros_tcp_port")
 
@@ -48,7 +57,7 @@ def generate_launch_description():
 
     robot_description = {
         "robot_description": ParameterValue(
-            Command(["xacro ", xacro_path, " command_qos:=reliable require_motor_enable:=false"]),
+            Command(["xacro ", xacro_path, " command_qos:=reliable require_motor_enable:=false", " lidar_model:=", LaunchConfiguration("lidar_model"), " ouster_x:=", LaunchConfiguration("ouster_x"), " ouster_y:=", LaunchConfiguration("ouster_y"), " ouster_z:=", LaunchConfiguration("ouster_z"), " ouster_roll:=", LaunchConfiguration("ouster_roll"), " ouster_pitch:=", LaunchConfiguration("ouster_pitch"), " ouster_yaw:=", LaunchConfiguration("ouster_yaw")]),
             value_type=str,
         )
     }
@@ -68,6 +77,47 @@ def generate_launch_description():
     }
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "use_motor_fault_injection", default_value="false", choices=["true", "false"],
+            description="Route motor commands through the fault injector; requires a command forwarder.",
+        ),
+        DeclareLaunchArgument(
+            "use_odom_fault_injection", default_value="false", choices=["true", "false"],
+            description="Feed injected wheel odometry into EKF; requires the odom injector.",
+        ),
+        DeclareLaunchArgument(
+            "use_slam", default_value="true", choices=["true", "false"],
+            description="Start SLAM Toolbox using Unity simulation time.",
+        ),
+        DeclareLaunchArgument(
+            "use_nav2", default_value="true", choices=["true", "false"],
+            description="Start Nav2 using Unity simulation time.",
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(PathJoinSubstitution([
+                FindPackageShare("rugged_rover_bringup"), "launch", "slam.launch.py",
+            ])),
+            condition=IfCondition(LaunchConfiguration("use_slam")),
+            launch_arguments={"use_sim_time": "true"}.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(PathJoinSubstitution([
+                FindPackageShare("rugged_rover_bringup"), "launch", "nav2.launch.py",
+            ])),
+            condition=IfCondition(LaunchConfiguration("use_nav2")),
+            launch_arguments={"use_sim_time": "true", "autostart": "true"}.items(),
+        ),
+        DeclareLaunchArgument(
+            "lidar_model", default_value="rplidar", choices=["rplidar", "ouster", "none"],
+            description="Lidar frames in the URDF; Ouster data must be supplied separately.",
+        ),
+        DeclareLaunchArgument("ouster_x", default_value="0"),
+        DeclareLaunchArgument("ouster_y", default_value="0"),
+        DeclareLaunchArgument("ouster_z", default_value="0.1905"),
+        DeclareLaunchArgument("ouster_roll", default_value="0"),
+        DeclareLaunchArgument("ouster_pitch", default_value="0"),
+        DeclareLaunchArgument("ouster_yaw", default_value="0"),
+
         DeclareLaunchArgument(
             "wheel_odom_topic",
             default_value="/odom_raw",
@@ -143,6 +193,8 @@ def generate_launch_description():
                 # Feed wheel-derived odometry into EKF. EKF republishes the
                 # fused odometry on /odom and owns odom -> base_link.
                 ("/diff_drive_controller/odom", wheel_odom_topic),
+                # Opt in to forwarding motor commands through the fault injector.
+                ("/platform/motors/cmd", motor_command_topic),
             ],
             output="screen",
         ),
@@ -151,7 +203,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(ekf_launch),
             launch_arguments={
                 "use_sim_time": "true",
-                "odom_topic": wheel_odom_topic,
+                "odom_topic": ekf_input_odom_topic,
                 "imu_topic": "/imu/data",
                 "output_odom_topic": ekf_output_odom_topic,
             }.items(),

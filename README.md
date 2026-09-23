@@ -982,3 +982,61 @@ Reece Holland
 
 - GitHub: https://github.com/reeceholland
 - Website: http://reeceholland.github.io/
+
+## Selecting lidar frames
+
+`unity_sim.launch.py` and `bringup.launch.py` accept `lidar_model:=rplidar`
+(default), `lidar_model:=ouster`, or `lidar_model:=none`. The default preserves
+`base_link -> laser`. Ouster selects `base_link -> os1_lidar`; none omits both.
+On real bringup, the RPLIDAR driver runs only when both `use_rplidar:=true` and
+`lidar_model:=rplidar` are selected.
+
+```bash
+ros2 launch rugged_rover_bringup unity_sim.launch.py lidar_model:=ouster
+```
+
+Set `ouster_x`, `ouster_y`, `ouster_z` in metres and `ouster_roll`,
+`ouster_pitch`, `ouster_yaw` in radians to match the lidar frame's actual pose
+relative to `base_link` in Unity or the physical robot. Defaults (0, 0, 0.1905;
+0, 0, 0) are placeholders at the existing mounting position, not an Ouster
+calibration. Do not publish another TF parent for `os1_lidar` simultaneously.
+
+This option only selects the robot description. It does not launch an Ouster
+driver, convert PointCloud2 to LaserScan, or provide `odom -> base_link`.
+The existing SLAM/Nav2 configuration still requires its configured scan input.
+
+Unity bringup starts SLAM Toolbox and Nav2 by default, both using simulation
+time. Use `use_slam:=false` and/or `use_nav2:=false` to disable them. Stop any
+separately launched SLAM/Nav2 instances before restarting Unity bringup. The
+navigation stack requires `/clock`, scan data, and valid TF; choosing an Ouster
+frame alone does not convert its point cloud to the configured 2D scan input.
+
+
+### Clean Unity mapping baseline
+
+The EKF is the sole publisher of `/odom` and `odom -> base_link`. The multi-injector
+scenario now publishes injected wheel odometry on `/wheel/odom_faulted`, not
+`/odom`. Unity bringup normally sends `/odom_raw` directly to the EKF. To test
+odometry faults, launch with `use_odom_fault_injection:=true` and run the updated
+multi-injector scenario. This feeds corrupted wheel odometry into the EKF so its
+odometry and TF remain consistent. Disable faults for baseline mapping.
+
+After stopping/restarting Unity Play mode (which resets `/clock` and the physical
+pose), stop and relaunch Unity bringup and restart the fault scenario for a fresh
+SLAM session. Do not continue mapping with the old pose graph after a world reset.
+Use simulation time in RViz. This is an explicit restart procedure, not automatic
+map reset or recovery.
+
+The Unity prefab corrects the front-left WheelCollider orientation while keeping
+its mesh pose. Scene overrides can still supersede it: inspect all four collider
+axes and confirm positive wheel motion moves the chassis forward before mapping.
+
+### Optional Unity motor-command fault injection
+
+Unity sends motor commands directly to `/platform/motors/cmd` by default.
+Set `use_motor_fault_injection:=true` to publish `/platform/motors/cmd_raw`
+instead; run a joint-state injector forwarding that topic to
+`/platform/motors/cmd`. Without the forwarder, the simulated rover cannot move.
+The headless CI runner explicitly enables this option for motion and navigation.
+This option is independent of `use_odom_fault_injection` and does not change
+physical-rover bringup.

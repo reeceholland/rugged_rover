@@ -3,6 +3,15 @@
   <xacro:arg name="command_qos" default="best_effort"/>
   <xacro:arg name="require_motor_enable" default="true"/>
 
+  <xacro:arg name="lidar_model" default="rplidar"/>
+  <!-- Ouster mount defaults are placeholders at the existing lidar position. -->
+  <xacro:arg name="ouster_x" default="0"/>
+  <xacro:arg name="ouster_y" default="0"/>
+  <xacro:arg name="ouster_z" default="0.1905"/>
+  <xacro:arg name="ouster_roll" default="0"/>
+  <xacro:arg name="ouster_pitch" default="0"/>
+  <xacro:arg name="ouster_yaw" default="0"/>
+
   <!-- Dimensions are in meters. ROS convention: X forward, Y left, Z up. -->
   <xacro:property name="chassis_length" value="0.320"/>
   <xacro:property name="chassis_width" value="0.241"/>
@@ -157,6 +166,7 @@
   <origin xyz="0.150 0 ${chassis_bottom_z_offset + 0.090}" rpy="0 0 0"/>
 </joint>
 
+  <xacro:if value="${'$(arg lidar_model)' == 'rplidar'}">
   <link name="laser">
     <visual>
       <origin xyz="0 0 0.015" rpy="0 0 0"/>
@@ -172,6 +182,17 @@
     <child link="laser"/>
     <origin xyz="0 0 ${chassis_bottom_z_offset + 0.190}" rpy="0 0 3.14159265359"/>
   </joint>
+
+  </xacro:if>
+  <xacro:if value="${'$(arg lidar_model)' == 'ouster'}">
+    <link name="os1_lidar"/>
+    <joint name="base_to_os1_lidar" type="fixed">
+      <parent link="base_link"/>
+      <child link="os1_lidar"/>
+      <origin xyz="$(arg ouster_x) $(arg ouster_y) $(arg ouster_z)"
+              rpy="$(arg ouster_roll) $(arg ouster_pitch) $(arg ouster_yaw)"/>
+    </joint>
+  </xacro:if>
 
   <link name="imu_link"/>
 

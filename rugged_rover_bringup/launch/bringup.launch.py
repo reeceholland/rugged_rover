@@ -91,12 +91,23 @@ def generate_launch_description():
 
     robot_description = {
         "robot_description": ParameterValue(
-            Command(["xacro ", xacro_path]),
+            Command(["xacro ", xacro_path, " lidar_model:=", LaunchConfiguration("lidar_model"), " ouster_x:=", LaunchConfiguration("ouster_x"), " ouster_y:=", LaunchConfiguration("ouster_y"), " ouster_z:=", LaunchConfiguration("ouster_z"), " ouster_roll:=", LaunchConfiguration("ouster_roll"), " ouster_pitch:=", LaunchConfiguration("ouster_pitch"), " ouster_yaw:=", LaunchConfiguration("ouster_yaw")]),
             value_type=str,
         )
     }
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "lidar_model", default_value="rplidar", choices=["rplidar", "ouster", "none"],
+            description="Lidar frames in the URDF; Ouster data must be supplied separately.",
+        ),
+        DeclareLaunchArgument("ouster_x", default_value="0"),
+        DeclareLaunchArgument("ouster_y", default_value="0"),
+        DeclareLaunchArgument("ouster_z", default_value="0.1905"),
+        DeclareLaunchArgument("ouster_roll", default_value="0"),
+        DeclareLaunchArgument("ouster_pitch", default_value="0"),
+        DeclareLaunchArgument("ouster_yaw", default_value="0"),
+
         DeclareLaunchArgument(
             "micro_ros_device",
             default_value="/dev/ttyAMA0",
@@ -198,7 +209,10 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(rplidar_launch),
-            condition=IfCondition(use_rplidar),
+            condition=IfCondition(PythonExpression([
+                "'", use_rplidar, "'.lower() in ('true', '1') and '",
+                LaunchConfiguration("lidar_model"), "' == 'rplidar'",
+            ])),
             launch_arguments={
                 "serial_port": rplidar_serial_port,
                 "serial_baudrate": rplidar_serial_baudrate,
