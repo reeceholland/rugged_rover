@@ -13,11 +13,12 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
-from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
+from nav2_common.launch import RewrittenYaml
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
@@ -25,9 +26,12 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     micro_ros_device = LaunchConfiguration("micro_ros_device")
     use_rplidar = LaunchConfiguration("use_rplidar")
+    use_d435 = LaunchConfiguration("use_d435")
     rplidar_serial_port = LaunchConfiguration("rplidar_serial_port")
     rplidar_serial_baudrate = LaunchConfiguration("rplidar_serial_baudrate")
     use_slam = LaunchConfiguration("use_slam")
+    use_nav2 = LaunchConfiguration("use_nav2")
+    enable_motors = LaunchConfiguration("enable_motors")
     use_ekf = LaunchConfiguration("use_ekf")
     ekf_output_odom_topic = LaunchConfiguration("ekf_output_odom_topic")
 
@@ -43,6 +47,12 @@ def generate_launch_description():
         "controllers.yaml",
     ])
 
+    controller_config = RewrittenYaml(
+        source_file=controller_config,
+        param_rewrites={"enable_odom_tf": PythonExpression(["'", use_ekf, "'.lower() != 'true'"])},
+        convert_types=True,
+    )
+
     imu_launch = PathJoinSubstitution([
         FindPackageShare("razor_imu"),
         "launch",
@@ -55,11 +65,11 @@ def generate_launch_description():
         "ekf.launch.py",
     ])
 
-    # d435_launch = PathJoinSubstitution([
-    #     FindPackageShare("rugged_rover_bringup"),
-    #     "launch",
-    #     "d435.launch.py",
-    # ])
+    d435_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "d435.launch.py",
+    ])
 
     rplidar_launch = PathJoinSubstitution([
         FindPackageShare("rugged_rover_bringup"),
@@ -73,14 +83,31 @@ def generate_launch_description():
         "slam.launch.py",
     ])
 
+    nav2_launch = PathJoinSubstitution([
+        FindPackageShare("rugged_rover_bringup"),
+        "launch",
+        "nav2.launch.py",
+    ])
+
     robot_description = {
         "robot_description": ParameterValue(
-            Command(["xacro ", xacro_path]),
+            Command(["xacro ", xacro_path, " lidar_model:=", LaunchConfiguration("lidar_model"), " ouster_x:=", LaunchConfiguration("ouster_x"), " ouster_y:=", LaunchConfiguration("ouster_y"), " ouster_z:=", LaunchConfiguration("ouster_z"), " ouster_roll:=", LaunchConfiguration("ouster_roll"), " ouster_pitch:=", LaunchConfiguration("ouster_pitch"), " ouster_yaw:=", LaunchConfiguration("ouster_yaw")]),
             value_type=str,
         )
     }
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "lidar_model", default_value="rplidar", choices=["rplidar", "ouster", "none"],
+            description="Lidar frames in the URDF; Ouster data must be supplied separately.",
+        ),
+        DeclareLaunchArgument("ouster_x", default_value="0"),
+        DeclareLaunchArgument("ouster_y", default_value="0"),
+        DeclareLaunchArgument("ouster_z", default_value="0.1905"),
+        DeclareLaunchArgument("ouster_roll", default_value="0"),
+        DeclareLaunchArgument("ouster_pitch", default_value="0"),
+        DeclareLaunchArgument("ouster_yaw", default_value="0"),
+
         DeclareLaunchArgument(
             "micro_ros_device",
             default_value="/dev/ttyAMA0",
@@ -88,8 +115,11 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "use_rplidar",
-            default_value="true",
-            description="Launch the RPLIDAR S2 driver.",
+            default_value="false",
+            description=(
+                "Launch the RPLIDAR S2 driver. Manager-controlled teleop and "
+                "autonomous modes enable this when the mode switch is active."
+            ),
         ),
         DeclareLaunchArgument(
             "rplidar_serial_port",
@@ -102,9 +132,24 @@ def generate_launch_description():
             description="Serial baudrate used by the RPLIDAR S2.",
         ),
         DeclareLaunchArgument(
+            "use_d435",
+            default_value="false",
+            description="Launch the RealSense D435 camera.",
+        ),
+        DeclareLaunchArgument(
             "use_slam",
             default_value="true",
             description="Launch slam_toolbox for live mapping.",
+        ),
+        DeclareLaunchArgument(
+            "use_nav2",
+            default_value="false",
+            description="Launch Nav2 navigation stack.",
+        ),
+        DeclareLaunchArgument(
+            "enable_motors",
+            default_value="false",
+            description="Publish the motor-enable heartbeat for direct bringup control.",
         ),
         DeclareLaunchArgument(
             "use_ekf",
@@ -157,13 +202,17 @@ def generate_launch_description():
             }.items(),
         ),
 
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(d435_launch),
-        # ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(d435_launch),
+            condition=IfCondition(use_d435),
+        ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(rplidar_launch),
-            condition=IfCondition(use_rplidar),
+            condition=IfCondition(PythonExpression([
+                "'", use_rplidar, "'.lower() in ('true', '1') and '",
+                LaunchConfiguration("lidar_model"), "' == 'rplidar'",
+            ])),
             launch_arguments={
                 "serial_port": rplidar_serial_port,
                 "serial_baudrate": rplidar_serial_baudrate,
@@ -178,6 +227,51 @@ def generate_launch_description():
             launch_arguments={
                 "use_sim_time": "false",
             }.items(),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(nav2_launch),
+            condition=IfCondition(use_nav2),
+            launch_arguments={
+                "use_sim_time": "false",
+                "autostart": "true",
+            }.items(),
+        ),
+
+        ExecuteProcess(
+            cmd=[
+                "ros2",
+                "run",
+                "topic_tools",
+                "transform",
+                "/cmd_vel",
+                "/diff_drive_controller/cmd_vel",
+                "geometry_msgs/msg/TwistStamped",
+                "geometry_msgs.msg.TwistStamped(header=std_msgs.msg.Header(frame_id='base_link'), twist=m)",
+                "--import",
+                "geometry_msgs",
+                "std_msgs",
+                "--wait-for-start",
+                "--qos-reliability",
+                "reliable",
+            ],
+            name="cmd_vel_to_diff_drive",
+            output="screen",
+            condition=UnlessCondition(use_nav2),
+        ),
+
+        ExecuteProcess(
+            cmd=[
+                "bash",
+                "-lc",
+                (
+                    "exec ros2 topic pub /rover/motors_enabled "
+                    "std_msgs/msg/Bool '{data: true}' -r 10 > /dev/null"
+                ),
+            ],
+            name="manual_motor_enable",
+            output="log",
+            condition=IfCondition(enable_motors),
         ),
 
         Node(
@@ -208,6 +302,7 @@ def generate_launch_description():
                     executable="spawner",
                     arguments=[
                         "diff_drive_controller",
+                        "--param-file", controller_config,
                         "--controller-manager",
                         "/controller_manager",
                     ],

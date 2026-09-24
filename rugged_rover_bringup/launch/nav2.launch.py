@@ -18,6 +18,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.parameter_descriptions import ParameterValue
+from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
@@ -32,6 +34,13 @@ def generate_launch_description():
         "config",
         "nav2_params.yaml",
     ])
+
+    # Explicit YAML values override the upstream launch's scoped SetParameter.
+    configured_params = RewrittenYaml(
+        source_file=nav2_params,
+        param_rewrites={"use_sim_time": use_sim_time},
+        convert_types=True,
+    )
 
     navigation_launch = PathJoinSubstitution([
         nav2_pkg,
@@ -56,7 +65,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(navigation_launch),
             launch_arguments={
                 "use_sim_time": use_sim_time,
-                "params_file": nav2_params,
+                "params_file": configured_params,
                 "autostart": autostart,
             }.items(),
         ),
@@ -65,6 +74,7 @@ def generate_launch_description():
             package="topic_tools",
             executable="transform",
             name="cmd_vel_to_diff_drive",
+            parameters=[{"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}],
             arguments=[
                 "/cmd_vel",
                 "/diff_drive_controller/cmd_vel",

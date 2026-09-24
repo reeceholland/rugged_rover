@@ -17,17 +17,27 @@
   <depend>rugged_rover_control</depend>
   <depend>rugged_rover_hardware_interfaces</depend>
 
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
   <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>rugged_rover_battery</exec_depend>
+  <exec_depend>micro_ros_agent</exec_depend>
+  <exec_depend>razor_imu</exec_depend>
+  <exec_depend>sllidar_ros2</exec_depend>
   <exec_depend>navigation2</exec_depend>
   <exec_depend>topic_tools</exec_depend>
   <exec_depend>robot_localization</exec_depend>
   <exec_depend>joy</exec_depend>
   <exec_depend>teleop_twist_joy</exec_depend>
+  <exec_depend>teleop_twist_keyboard</exec_depend>
   <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>depthimage_to_laserscan</exec_depend>
 
+  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

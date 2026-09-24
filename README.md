@@ -26,6 +26,7 @@ The stack supports:
 | `rugged_rover_control` | `ros2_control` controller configuration. |
 | `rugged_rover_hardware_interfaces` | Custom Sabertooth `ros2_control` hardware interface. |
 | `rugged_rover_battery` | Battery voltage monitor and diagnostics node. |
+| `rugged_rover_manager` | GPIO mode switch manager for teleop/autonomous launch control and safety state publishing. |
 | `rugged_rover_interfaces` | Custom message and service definitions. |
 | `rugged_rover_test` | Small command/test publishers. |
 | `micro_ros_platform_firmware` | Teensy firmware for the A4WD3 platform. |
@@ -46,6 +47,7 @@ The current A4WD3 setup assumes:
 - RPLIDAR S2 on `/dev/rplidar`
 - SparkFun Razor IMU on `/dev/razor_imu`
 - Teensy micro-ROS UART on `/dev/ttyAMA0`
+- GPIO24 active-low mode switch for manager-controlled teleop/autonomous selection
 - Optional RealSense D435 depth camera
 - Common ground between the Pi, Teensy, motor driver, battery monitor, and motor power system
 
@@ -60,6 +62,100 @@ These are effective odometry values, not simply the measured wheel-to-wheel
 distance. The physical rear wheel center-to-center distance is about `0.355 m`,
 but the skid-steer odometry needed a larger effective separation after rotation
 testing.
+
+## Normal Rover Operation
+
+The normal real-rover entrypoint is the manager service. It owns the physical
+mode switch, starts the selected launch mode, starts the lidar only while a mode
+is active, and publishes the `/rover/motors_enabled` safety state. Avoid starting
+`bringup.launch.py` manually while the manager is running because duplicate
+hardware, controller, or SLAM nodes can compete for the same topics and devices.
+
+The manager service also reapplies `/dev/ttyAMA0` permissions before every start,
+so restarting the service recovers the micro-ROS UART permission issue without a
+separate `chmod` step.
+
+Check the manager service:
+
+```bash
+systemctl status rover-manager.service --no-pager -l
+```
+
+Restart it after rebuilding or changing manager configuration:
+
+```bash
+sudo systemctl restart rover-manager.service
+```
+
+Watch the manager while testing the physical switch:
+
+```bash
+journalctl -u rover-manager.service -f
+```
+
+Useful ROS state checks:
+
+```bash
+ros2 topic echo /rover/state --once
+ros2 topic echo /rover/events --once
+ros2 topic echo /rover/motors_enabled --once
+ros2 control list_controllers
+```
+
+The configured GPIO24 mode switch is active-low. Its behavior is:
+
+- switch on: teleop/mapping mode after the double-toggle window expires
+- switch off then on twice within the configured window: autonomous/Nav2 mode
+- switch off: stop the active mode and disable motion
+
+Keyboard teleop needs a focused terminal for key input. Start it separately after
+the switch has selected teleop mode:
+
+```bash
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+For manual debugging without `rover_manager`, start teleop with explicit motor
+and lidar choices:
+
+```bash
+ros2 launch rugged_rover_bringup teleop.launch.py enable_motors:=true use_rplidar:=true
+```
+
+Leave `enable_motors` at its default `false` for manager-controlled launches. Bare
+`bringup.launch.py` defaults to `use_rplidar:=false`; manager-controlled teleop
+and autonomous modes explicitly enable lidar while the switch is high.
+
+## Select keyboard or joypad
+
+Set `teleop_input: keyboard` or `teleop_input: joypad` in
+`rugged_rover_manager/config/rover_manager.yaml`. `teleop_joy_dev` selects the
+joypad device index (default 0). Rebuild the manager and bringup packages, then
+restart the manager service with the physical switch off. The selection applies
+when the manager next launches teleop; it is not a live input switch.
+
+Keyboard is the default. After selecting teleop with the physical switch, run
+`ros2 run teleop_twist_keyboard teleop_twist_keyboard` in a focused terminal.
+Joypad mode automatically starts `joy_node` and `teleop_twist_joy`; no keyboard
+process is started. The joypad must be connected to the computer running teleop.
+
+For standalone launches (with the manager stopped):
+
+```bash
+ros2 launch rugged_rover_bringup teleop.launch.py teleop_input:=keyboard
+ros2 launch rugged_rover_bringup teleop.launch.py teleop_input:=joypad joy_dev:=0
+```
+
+These commands keep motor enable disabled by default. Use the existing explicit
+`enable_motors:=true` option for manual driving. Both inputs publish `Twist` on
+`/cmd_vel`, which bringup converts to the controller's `TwistStamped` commands.
+Run only the selected input publisher during driving; this selection does not
+arbitrate unrelated publishers on `/cmd_vel`.
+
+Joypad axes, speeds, and buttons are configured in
+`rugged_rover_bringup/config/joy.yaml`. Button 4 enables normal driving; button 5
+independently enables turbo. Verify the mapping for your controller, including
+release and disconnect stopping behavior, with wheels raised first.
 
 ## Fresh Raspberry Pi 5 Setup
 
@@ -82,9 +178,10 @@ The installer:
 - initializes submodules
 - creates udev aliases for the Teensy UART, RPLIDAR, and Razor IMU
 - builds the workspace
+- installs and enables the rover manager systemd services
 - adds ROS setup lines to ~/.bashrc
 
-After the script finishes, reboot:
+After the script finishes, reboot so group membership, udev, and systemd startup are cleanly applied:
 
 ```bash
 sudo reboot
@@ -349,6 +446,84 @@ Use an explicit RPLIDAR port:
 ```bash
 ros2 launch rugged_rover_bringup bringup.launch.py rplidar_serial_port:=/dev/ttyUSB0
 ```
+
+Include Nav2 in the same launch tree:
+
+```bash
+ros2 launch rugged_rover_bringup bringup.launch.py use_ekf:=true use_slam:=true use_rplidar:=true use_nav2:=true
+```
+
+## Rover Manager and Mode Switch
+
+`rugged_rover_manager` is the preferred runtime entrypoint on the physical rover. It owns the GPIO24 mode switch, starts and stops launch trees, publishes rover state, and disables motors during stop, low-battery, and fault transitions.
+
+Manager topics:
+
+- `/rover/state`: current state, such as `idle`, `teleop`, or `autonomous`
+- `/rover/events`: state transition messages
+- `/rover/motors_enabled`: high-level motor-enable intent
+
+Switch behavior:
+
+- low/off: stop the active launch tree and return to `idle`
+- one low-to-high rising edge: wait `double_toggle_window_sec`, then enter teleop
+- two low-to-high rising edges within `double_toggle_window_sec`: enter autonomous immediately
+
+Autonomous mode launches:
+
+```bash
+ros2 launch rugged_rover_bringup bringup.launch.py use_ekf:=true use_slam:=true use_rplidar:=true use_nav2:=true
+```
+
+Run manually:
+
+```bash
+cd ~/rugged_rover_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch rugged_rover_manager rover_manager.launch.py use_respawn:=false
+```
+
+The bootstrap script installs and enables `rover-uart-permissions.service` and `rover-manager.service`. For boot startup, run only `rover-manager.service` under systemd. Disable older services that directly launch bringup, teleop, Nav2, or mode switching so they do not fight over ROS nodes or serial devices:
+
+```bash
+sudo systemctl disable --now rover-bringup.service rover-mode-switch.service rover-teleop.service rover-nav2.service 2>/dev/null || true
+```
+
+The manager service should require a UART permission oneshot before it starts:
+
+```ini
+[Unit]
+Description=Rugged Rover Manager
+After=network-online.target rover-uart-permissions.service
+Wants=network-online.target
+Requires=rover-uart-permissions.service
+```
+
+The UART oneshot currently applies the practical Pi UART permission fix:
+
+```ini
+[Service]
+Type=oneshot
+ExecStart=/bin/chmod 666 /dev/ttyAMA0
+RemainAfterExit=yes
+```
+
+If you manually create or change the services later:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable rover-uart-permissions.service rover-manager.service
+sudo systemctl start rover-manager.service
+journalctl -u rover-manager.service -f
+```
+
+## Reliable Teleop Milestone
+
+See [teleop acceptance](docs/teleop_acceptance.md) for the stop contract, build steps,
+regression tests, and pending physical checks. Real bringup now requires fresh
+manager enable heartbeats before sending nonzero hardware commands. Teleop mode
+also starts joystick control.
 
 ## Validate the Stack
 
@@ -720,8 +895,12 @@ ls -l /dev/ttyAMA0
 sudo chmod 666 /dev/ttyAMA0
 ```
 
-The `chmod` command is a temporary fix. The persistent fix is the udev rule in
-`install_pi5_ubuntu24_ros_jazzy.sh`, followed by a reboot.
+The `chmod` command is a temporary fix. The persistent fix is installed by
+`install_pi5_ubuntu24_ros_jazzy.sh` as `rover-uart-permissions.service`, followed by a reboot or:
+
+```bash
+sudo systemctl start rover-uart-permissions.service
+```
 
 Lidar or camera disappears:
 
@@ -803,3 +982,61 @@ Reece Holland
 
 - GitHub: https://github.com/reeceholland
 - Website: http://reeceholland.github.io/
+
+## Selecting lidar frames
+
+`unity_sim.launch.py` and `bringup.launch.py` accept `lidar_model:=rplidar`
+(default), `lidar_model:=ouster`, or `lidar_model:=none`. The default preserves
+`base_link -> laser`. Ouster selects `base_link -> os1_lidar`; none omits both.
+On real bringup, the RPLIDAR driver runs only when both `use_rplidar:=true` and
+`lidar_model:=rplidar` are selected.
+
+```bash
+ros2 launch rugged_rover_bringup unity_sim.launch.py lidar_model:=ouster
+```
+
+Set `ouster_x`, `ouster_y`, `ouster_z` in metres and `ouster_roll`,
+`ouster_pitch`, `ouster_yaw` in radians to match the lidar frame's actual pose
+relative to `base_link` in Unity or the physical robot. Defaults (0, 0, 0.1905;
+0, 0, 0) are placeholders at the existing mounting position, not an Ouster
+calibration. Do not publish another TF parent for `os1_lidar` simultaneously.
+
+This option only selects the robot description. It does not launch an Ouster
+driver, convert PointCloud2 to LaserScan, or provide `odom -> base_link`.
+The existing SLAM/Nav2 configuration still requires its configured scan input.
+
+Unity bringup starts SLAM Toolbox and Nav2 by default, both using simulation
+time. Use `use_slam:=false` and/or `use_nav2:=false` to disable them. Stop any
+separately launched SLAM/Nav2 instances before restarting Unity bringup. The
+navigation stack requires `/clock`, scan data, and valid TF; choosing an Ouster
+frame alone does not convert its point cloud to the configured 2D scan input.
+
+
+### Clean Unity mapping baseline
+
+The EKF is the sole publisher of `/odom` and `odom -> base_link`. The multi-injector
+scenario now publishes injected wheel odometry on `/wheel/odom_faulted`, not
+`/odom`. Unity bringup normally sends `/odom_raw` directly to the EKF. To test
+odometry faults, launch with `use_odom_fault_injection:=true` and run the updated
+multi-injector scenario. This feeds corrupted wheel odometry into the EKF so its
+odometry and TF remain consistent. Disable faults for baseline mapping.
+
+After stopping/restarting Unity Play mode (which resets `/clock` and the physical
+pose), stop and relaunch Unity bringup and restart the fault scenario for a fresh
+SLAM session. Do not continue mapping with the old pose graph after a world reset.
+Use simulation time in RViz. This is an explicit restart procedure, not automatic
+map reset or recovery.
+
+The Unity prefab corrects the front-left WheelCollider orientation while keeping
+its mesh pose. Scene overrides can still supersede it: inspect all four collider
+axes and confirm positive wheel motion moves the chassis forward before mapping.
+
+### Optional Unity motor-command fault injection
+
+Unity sends motor commands directly to `/platform/motors/cmd` by default.
+Set `use_motor_fault_injection:=true` to publish `/platform/motors/cmd_raw`
+instead; run a joint-state injector forwarding that topic to
+`/platform/motors/cmd`. Without the forwarder, the simulated rover cannot move.
+The headless CI runner explicitly enables this option for motion and navigation.
+This option is independent of `use_odom_fault_injection` and does not change
+physical-rover bringup.

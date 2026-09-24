@@ -9,7 +9,7 @@ teleop_twist_joy_node:
     # Hold this button while driving. On many Xbox-style controllers this is LB.
     enable_button: 4
 
-    # Hold this button as well for the faster scale. On many Xbox-style controllers this is RB.
+    # This is a separate drive-enable button for turbo; LB is not required. Often RB.
     enable_turbo_button: 5
 
     # Left stick vertical controls forward/back.

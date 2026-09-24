@@ -1,0 +1,91 @@
+# Copyright 2026 Reece Holland
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import EqualsSubstitution, LaunchConfiguration, PathJoinSubstitution
+
+from launch_ros.substitutions import FindPackageShare
+
+
+def generate_launch_description():
+    use_ekf = LaunchConfiguration("use_ekf")
+    use_slam = LaunchConfiguration("use_slam")
+    use_rplidar = LaunchConfiguration("use_rplidar")
+    enable_motors = LaunchConfiguration("enable_motors")
+
+    bringup_share = FindPackageShare("rugged_rover_bringup")
+
+    bringup_launch = PathJoinSubstitution([
+        bringup_share,
+        "launch",
+        "bringup.launch.py",
+    ])
+
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            "teleop_input", default_value="keyboard", choices=["keyboard", "joypad"],
+            description="Keyboard in a separate terminal, or an automatically launched joypad.",
+        ),
+        DeclareLaunchArgument(
+            "joy_dev", default_value="0", description="Joypad device index.",
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(PathJoinSubstitution([
+                bringup_share, "launch", "joy.launch.py",
+            ])),
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration("teleop_input"), "joypad")),
+            launch_arguments={
+                "joy_dev": LaunchConfiguration("joy_dev"),
+                "cmd_vel_topic": "/cmd_vel",
+                "publish_stamped_twist": "false",
+            }.items(),
+        ),
+        DeclareLaunchArgument(
+            "use_ekf",
+            default_value="true",
+            description="Start EKF through bringup.",
+        ),
+        DeclareLaunchArgument(
+            "use_slam",
+            default_value="true",
+            description="Start SLAM through bringup.",
+        ),
+        DeclareLaunchArgument(
+            "use_rplidar",
+            default_value="true",
+            description="Start RPLidar through bringup.",
+        ),
+        DeclareLaunchArgument(
+            "enable_motors",
+            default_value="false",
+            description=(
+                "Publish a direct motor-enable heartbeat for manual teleop launches. "
+                "Leave false when teleop is started by rover_manager."
+            ),
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(bringup_launch),
+            launch_arguments={
+                "use_ekf": use_ekf,
+                "use_slam": use_slam,
+                "use_rplidar": use_rplidar,
+                "enable_motors": enable_motors,
+            }.items(),
+        ),
+    ])

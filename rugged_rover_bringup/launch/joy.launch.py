@@ -16,6 +16,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -32,6 +33,10 @@ def generate_launch_description():
     cmd_vel_topic = LaunchConfiguration("cmd_vel_topic")
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            "publish_stamped_twist", default_value="true", choices=["true", "false"],
+            description="Use stamped commands for direct controller input.",
+        ),
         DeclareLaunchArgument(
             "joy_dev",
             default_value="0",
@@ -50,7 +55,7 @@ def generate_launch_description():
             name="joy_node",
             parameters=[
                 joy_config,
-                {"device_id": joy_dev},
+                {"device_id": ParameterValue(joy_dev, value_type=int)},
             ],
             output="screen",
         ),
@@ -59,7 +64,10 @@ def generate_launch_description():
             package="teleop_twist_joy",
             executable="teleop_node",
             name="teleop_twist_joy_node",
-            parameters=[joy_config],
+            parameters=[joy_config, {
+                "publish_stamped_twist": ParameterValue(
+                    LaunchConfiguration("publish_stamped_twist"), value_type=bool),
+            }],
             remappings=[
                 ("/cmd_vel", cmd_vel_topic),
             ],
