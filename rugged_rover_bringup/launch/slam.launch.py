@@ -13,10 +13,54 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    EmitEvent,
+    LogError,
+    LogInfo,
+    OpaqueFunction,
+    RegisterEventHandler,
+    SetLaunchConfiguration,
+    TimerAction,
+)
+from launch.events import Shutdown, matches_action
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import Node
+from launch_ros.actions import LifecycleNode
+from launch_ros.event_handlers import OnStateTransition
+from launch_ros.events.lifecycle import ChangeState
 from launch_ros.substitutions import FindPackageShare
+from lifecycle_msgs.msg import Transition
+
+
+LIFECYCLE_TIMEOUT_SEC = 10.0
+
+
+def _configuration_timeout(context):
+    if context.launch_configurations.get("slam_configured") == "true":
+        return []
+
+    reason = (
+        f"slam_toolbox failed to configure within "
+        f"{LIFECYCLE_TIMEOUT_SEC:.1f} seconds"
+    )
+    return [
+        LogError(msg=f"[SLAM] {reason}."),
+        EmitEvent(event=Shutdown(reason=reason)),
+    ]
+
+
+def _activation_timeout(context):
+    if context.launch_configurations.get("slam_active") == "true":
+        return []
+
+    reason = (
+        f"slam_toolbox failed to activate within "
+        f"{LIFECYCLE_TIMEOUT_SEC:.1f} seconds after configuration"
+    )
+    return [
+        LogError(msg=f"[SLAM] {reason}."),
+        EmitEvent(event=Shutdown(reason=reason)),
+    ]
 
 
 def generate_launch_description():
@@ -29,6 +73,114 @@ def generate_launch_description():
         "slam_toolbox.yaml",
     ])
 
+    slam_node = LifecycleNode(
+        package="slam_toolbox",
+        executable="async_slam_toolbox_node",
+        name="slam_toolbox",
+        output="screen",
+        parameters=[
+            slam_params,
+            {"use_sim_time": use_sim_time},
+        ],
+    )
+
+    configure_slam = EmitEvent(
+        event=ChangeState(
+            lifecycle_node_matcher=matches_action(slam_node),
+            transition_id=Transition.TRANSITION_CONFIGURE,
+        ),
+    )
+
+    configure_success = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=slam_node,
+            start_state="configuring",
+            goal_state="inactive",
+            entities=[
+                SetLaunchConfiguration("slam_configured", "true"),
+                LogInfo(msg="[SLAM] Configuration succeeded; activating."),
+                EmitEvent(
+                    event=ChangeState(
+                        lifecycle_node_matcher=matches_action(slam_node),
+                        transition_id=Transition.TRANSITION_ACTIVATE,
+                    ),
+                ),
+                TimerAction(
+                    period=LIFECYCLE_TIMEOUT_SEC,
+                    actions=[
+                        OpaqueFunction(function=_activation_timeout),
+                    ],
+                ),
+            ],
+        ),
+    )
+
+    configure_failure = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=slam_node,
+            start_state="configuring",
+            goal_state="unconfigured",
+            entities=[
+                LogError(msg="[SLAM] Configuration transition failed."),
+                EmitEvent(
+                    event=Shutdown(
+                        reason="slam_toolbox configuration transition failed"
+                    ),
+                ),
+            ],
+        ),
+    )
+
+    activate_success = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=slam_node,
+            start_state="activating",
+            goal_state="active",
+            entities=[
+                SetLaunchConfiguration("slam_active", "true"),
+                LogInfo(msg="[SLAM] slam_toolbox is active."),
+            ],
+        ),
+    )
+
+    activate_failure = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=slam_node,
+            start_state="activating",
+            goal_state="inactive",
+            entities=[
+                LogError(msg="[SLAM] Activation transition failed."),
+                EmitEvent(
+                    event=Shutdown(
+                        reason="slam_toolbox activation transition failed"
+                    ),
+                ),
+            ],
+        ),
+    )
+
+    lifecycle_error = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=slam_node,
+            goal_state="errorprocessing",
+            entities=[
+                LogError(msg="[SLAM] slam_toolbox entered error processing."),
+                EmitEvent(
+                    event=Shutdown(
+                        reason="slam_toolbox entered lifecycle error processing"
+                    ),
+                ),
+            ],
+        ),
+    )
+
+    configuration_watchdog = TimerAction(
+        period=LIFECYCLE_TIMEOUT_SEC,
+        actions=[
+            OpaqueFunction(function=_configuration_timeout),
+        ],
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument(
             "use_sim_time",
@@ -36,52 +188,18 @@ def generate_launch_description():
             description="Use simulated /clock for slam_toolbox.",
         ),
 
-        Node(
-            package="slam_toolbox",
-            executable="async_slam_toolbox_node",
-            name="slam_toolbox",
-            output="screen",
-            parameters=[
-                slam_params,
-                {"use_sim_time": use_sim_time},
-            ],
-        ),
+        SetLaunchConfiguration("slam_configured", "false"),
+        SetLaunchConfiguration("slam_active", "false"),
 
-        TimerAction(
-            period=3.0,
-            actions=[
-                ExecuteProcess(
-                    cmd=[
-                        "bash",
-                        "-lc",
-                        "until ros2 service list | grep -q '^/slam_toolbox/change_state$'; "
-                        "do sleep 0.2; done; "
-                        "ros2 service call /slam_toolbox/change_state "
-                        "lifecycle_msgs/srv/ChangeState "
-                        "'{transition: {id: 1}}'",
-                    ],
-                    output="screen",
-                ),
-            ],
-        ),
+        # Register transition handlers before requesting configuration so no
+        # lifecycle event can be missed.
+        configure_success,
+        configure_failure,
+        activate_success,
+        activate_failure,
+        lifecycle_error,
 
-        TimerAction(
-            period=6.0,
-            actions=[
-                ExecuteProcess(
-                    cmd=[
-                        "bash",
-                        "-lc",
-                        "until ros2 service call /slam_toolbox/get_state "
-                        "lifecycle_msgs/srv/GetState "
-                        "'{}' 2>/dev/null | grep -Eq 'id=2|id: 2'; "
-                        "do sleep 0.2; done; "
-                        "ros2 service call /slam_toolbox/change_state "
-                        "lifecycle_msgs/srv/ChangeState "
-                        "'{transition: {id: 3}}'",
-                    ],
-                    output="screen",
-                ),
-            ],
-        ),
+        slam_node,
+        configure_slam,
+        configuration_watchdog,
     ])
