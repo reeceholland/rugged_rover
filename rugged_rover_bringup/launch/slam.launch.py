@@ -21,7 +21,6 @@ from launch.actions import (
     LogInfo,
     OpaqueFunction,
     RegisterEventHandler,
-    SetLaunchConfiguration,
     TimerAction,
 )
 from launch.events import Shutdown, matches_action
@@ -33,7 +32,7 @@ from launch_ros.substitutions import FindPackageShare
 from lifecycle_msgs.msg import Transition
 
 
-LIFECYCLE_TIMEOUT_SEC = 10.0
+LIFECYCLE_TIMEOUT_SEC = 30.0
 LOGGER = launch.logging.get_logger("rugged_rover.slam_launch")
 
 
@@ -43,31 +42,39 @@ def _log_error(context, message):
     return []
 
 
-def _configuration_timeout(context):
-    if context.launch_configurations.get("slam_configured") == "true":
+def _configuration_timeout(context, state):
+    if state["configured"]:
         return []
 
     reason = (
         "slam_toolbox failed to configure within "
         f"{LIFECYCLE_TIMEOUT_SEC:.1f} seconds"
     )
-    LOGGER.error("[SLAM] %s.", reason)
+    LOGGER.error(f"[SLAM] {reason}.")
     return [EmitEvent(event=Shutdown(reason=reason))]
 
 
-def _activation_timeout(context):
-    if context.launch_configurations.get("slam_active") == "true":
+def _activation_timeout(context, state):
+    if state["active"]:
         return []
 
     reason = (
         "slam_toolbox failed to activate within "
         f"{LIFECYCLE_TIMEOUT_SEC:.1f} seconds after configuration"
     )
-    LOGGER.error("[SLAM] %s.", reason)
+    LOGGER.error(f"[SLAM] {reason}.")
     return [EmitEvent(event=Shutdown(reason=reason))]
 
 
+def _mark_state(context, state, key):
+    # LaunchConfiguration changes in lifecycle event contexts are scoped; use
+    # state owned by this launch description so watchdogs see the transitions.
+    state[key] = True
+    return []
+
+
 def generate_launch_description():
+    state = {"configured": False, "active": False}
     bringup_pkg = FindPackageShare("rugged_rover_bringup")
     use_sim_time = LaunchConfiguration("use_sim_time")
 
@@ -102,7 +109,7 @@ def generate_launch_description():
             start_state="configuring",
             goal_state="inactive",
             entities=[
-                SetLaunchConfiguration("slam_configured", "true"),
+                OpaqueFunction(function=_mark_state, kwargs={"state": state, "key": "configured"}),
                 LogInfo(msg="[SLAM] Configuration succeeded; activating."),
                 EmitEvent(
                     event=ChangeState(
@@ -112,7 +119,7 @@ def generate_launch_description():
                 ),
                 TimerAction(
                     period=LIFECYCLE_TIMEOUT_SEC,
-                    actions=[OpaqueFunction(function=_activation_timeout)],
+                    actions=[OpaqueFunction(function=_activation_timeout, kwargs={"state": state})],
                 ),
             ],
         ),
@@ -143,7 +150,7 @@ def generate_launch_description():
             start_state="activating",
             goal_state="active",
             entities=[
-                SetLaunchConfiguration("slam_active", "true"),
+                OpaqueFunction(function=_mark_state, kwargs={"state": state, "key": "active"}),
                 LogInfo(msg="[SLAM] slam_toolbox is active."),
             ],
         ),
@@ -190,7 +197,7 @@ def generate_launch_description():
 
     configuration_watchdog = TimerAction(
         period=LIFECYCLE_TIMEOUT_SEC,
-        actions=[OpaqueFunction(function=_configuration_timeout)],
+        actions=[OpaqueFunction(function=_configuration_timeout, kwargs={"state": state})],
     )
 
     return LaunchDescription([
@@ -199,8 +206,6 @@ def generate_launch_description():
             default_value="false",
             description="Use simulated /clock for slam_toolbox.",
         ),
-        SetLaunchConfiguration("slam_configured", "false"),
-        SetLaunchConfiguration("slam_active", "false"),
         # Register transition handlers before requesting configuration so no
         # lifecycle event can be missed.
         configure_success,
