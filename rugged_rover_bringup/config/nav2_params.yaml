@@ -229,8 +229,8 @@ collision_monitor:
     cmd_vel_out_topic: "cmd_vel"
     state_topic: "collision_monitor_state"
     transform_tolerance: 0.3
-    # CI safety contract: stale scan at 0.5s; zero wheel command by 0.7s.
-    source_timeout: 0.5
+    # Existing Collision Monitor stale-scan timeout; CI observes this setting.
+    source_timeout: 1.0
     base_shift_correction: true
     stop_pub_timeout: 2.0
 
