@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import launch.logging
+
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     EmitEvent,
-    LogError,
     LogInfo,
     OpaqueFunction,
     RegisterEventHandler,
@@ -33,6 +34,13 @@ from lifecycle_msgs.msg import Transition
 
 
 LIFECYCLE_TIMEOUT_SEC = 10.0
+LOGGER = launch.logging.get_logger("rugged_rover.slam_launch")
+
+
+def _log_error(context, message):
+    del context
+    LOGGER.error(message)
+    return []
 
 
 def _configuration_timeout(context):
@@ -40,13 +48,11 @@ def _configuration_timeout(context):
         return []
 
     reason = (
-        f"slam_toolbox failed to configure within "
+        "slam_toolbox failed to configure within "
         f"{LIFECYCLE_TIMEOUT_SEC:.1f} seconds"
     )
-    return [
-        LogError(msg=f"[SLAM] {reason}."),
-        EmitEvent(event=Shutdown(reason=reason)),
-    ]
+    LOGGER.error("[SLAM] %s.", reason)
+    return [EmitEvent(event=Shutdown(reason=reason))]
 
 
 def _activation_timeout(context):
@@ -54,13 +60,11 @@ def _activation_timeout(context):
         return []
 
     reason = (
-        f"slam_toolbox failed to activate within "
+        "slam_toolbox failed to activate within "
         f"{LIFECYCLE_TIMEOUT_SEC:.1f} seconds after configuration"
     )
-    return [
-        LogError(msg=f"[SLAM] {reason}."),
-        EmitEvent(event=Shutdown(reason=reason)),
-    ]
+    LOGGER.error("[SLAM] %s.", reason)
+    return [EmitEvent(event=Shutdown(reason=reason))]
 
 
 def generate_launch_description():
@@ -77,6 +81,7 @@ def generate_launch_description():
         package="slam_toolbox",
         executable="async_slam_toolbox_node",
         name="slam_toolbox",
+        namespace="",
         output="screen",
         parameters=[
             slam_params,
@@ -107,9 +112,7 @@ def generate_launch_description():
                 ),
                 TimerAction(
                     period=LIFECYCLE_TIMEOUT_SEC,
-                    actions=[
-                        OpaqueFunction(function=_activation_timeout),
-                    ],
+                    actions=[OpaqueFunction(function=_activation_timeout)],
                 ),
             ],
         ),
@@ -121,7 +124,10 @@ def generate_launch_description():
             start_state="configuring",
             goal_state="unconfigured",
             entities=[
-                LogError(msg="[SLAM] Configuration transition failed."),
+                OpaqueFunction(
+                    function=_log_error,
+                    kwargs={"message": "[SLAM] Configuration transition failed."},
+                ),
                 EmitEvent(
                     event=Shutdown(
                         reason="slam_toolbox configuration transition failed"
@@ -149,7 +155,10 @@ def generate_launch_description():
             start_state="activating",
             goal_state="inactive",
             entities=[
-                LogError(msg="[SLAM] Activation transition failed."),
+                OpaqueFunction(
+                    function=_log_error,
+                    kwargs={"message": "[SLAM] Activation transition failed."},
+                ),
                 EmitEvent(
                     event=Shutdown(
                         reason="slam_toolbox activation transition failed"
@@ -164,7 +173,12 @@ def generate_launch_description():
             target_lifecycle_node=slam_node,
             goal_state="errorprocessing",
             entities=[
-                LogError(msg="[SLAM] slam_toolbox entered error processing."),
+                OpaqueFunction(
+                    function=_log_error,
+                    kwargs={
+                        "message": "[SLAM] slam_toolbox entered error processing."
+                    },
+                ),
                 EmitEvent(
                     event=Shutdown(
                         reason="slam_toolbox entered lifecycle error processing"
@@ -176,9 +190,7 @@ def generate_launch_description():
 
     configuration_watchdog = TimerAction(
         period=LIFECYCLE_TIMEOUT_SEC,
-        actions=[
-            OpaqueFunction(function=_configuration_timeout),
-        ],
+        actions=[OpaqueFunction(function=_configuration_timeout)],
     )
 
     return LaunchDescription([
@@ -187,10 +199,8 @@ def generate_launch_description():
             default_value="false",
             description="Use simulated /clock for slam_toolbox.",
         ),
-
         SetLaunchConfiguration("slam_configured", "false"),
         SetLaunchConfiguration("slam_active", "false"),
-
         # Register transition handlers before requesting configuration so no
         # lifecycle event can be missed.
         configure_success,
@@ -198,7 +208,6 @@ def generate_launch_description():
         activate_success,
         activate_failure,
         lifecycle_error,
-
         slam_node,
         configure_slam,
         configuration_watchdog,
